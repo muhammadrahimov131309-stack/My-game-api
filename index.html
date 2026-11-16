@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Игра</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --accent: #00ffcc;
+            --text: #ffffff;
+            --subtext: #aaaaaa;
+        }
+        body {
+            margin: 0; padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .profile-card {
+            background: var(--card-bg);
+            width: 100%; max-width: 400px;
+            border-radius: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .avatar {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #00ffcc, #0066ff);
+            display: inline-flex;
+            align-items: center; justify-content: center;
+            font-size: 32px; font-weight: bold;
+            margin-bottom: 15px;
+        }
+        h1 { margin: 0 0 5px 0; font-size: 24px; }
+        .balance {
+            font-size: 36px; font-weight: bold;
+            color: var(--accent);
+            margin: 10px 0;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%; max-width: 400px;
+        }
+        .menu-btn {
+            background: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 15px;
+            padding: 20px 10px;
+            color: var(--text);
+            font-size: 16px; font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .menu-btn:active { transform: scale(0.95); border-color: var(--accent); }
+        .menu-btn span { font-size: 28px; }
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 30px; height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- Загрузка -->
+    <div id="loading" style="margin-top: 50px;">
+        <div class="loader"></div>
+        <p style="color: var(--subtext);">Загружаем данные...</p>
+    </div>
+
+    <!-- Профиль (скрыт пока грузится) -->
+    <div id="app" style="display: none; width: 100%; display: flex; flex-direction: column; align-items: center;">
+        <div class="profile-card">
+            <div class="avatar" id="avatar">?</div>
+            <h1 id="nickname">Загрузка...</h1>
+            <p style="color: var(--subtext); margin: 0;">Игровой профиль</p>
+            <div class="balance" id="balance">0 💰</div>
+        </div>
+
+        <div class="menu-grid">
+            <div class="menu-btn"><span>🎰</span> Казино</div>
+            <div class="menu-btn"><span>🛒</span> Магазин</div>
+            <div class="menu-btn"><span>💼</span> Работа</div>
+            <div class="menu-btn"><span>🏴</span> Банда</div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем на весь экран
+
+        // ТВОЙ URL С RENDER (ЗАМЕНИ НА СВОЙ!)
+        const API_URL = "https://ТВОЯ_ССЫЛКА.onrender.com"; 
+
+        // Получаем ID пользователя из Телеграма
+        const userId = tg.initDataUnsafe?.user?.id;
+        const userName = tg.initDataUnsafe?.user?.first_name || "Игрок";
+
+        // Если открыли не в Телеграме (для теста), ставим твой ID
+        const finalUserId = userId || 7127705775; 
+
+        async function loadProfile() {
+            try {
+                const response = await fetch(`${API_URL}/api/profile/${finalUserId}`);
+                if (!response.ok) throw new Error("Ошибка сервера");
+                
+                const data = await response.json();
+                
+                // Заполняем данные
+                document.getElementById('nickname').innerText = data.nickname;
+                document.getElementById('balance').innerText = data.balance.toLocaleString('ru-RU') + " 💰";
+                document.getElementById('avatar').innerText = data.nickname.charAt(0).toUpperCase();
+                
+                // Показываем интерфейс
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('app').style.display = 'flex';
+                
+                // Настраиваем цвет шапки Телеграма
+                tg.setHeaderColor('#121212');
+                tg.setBackgroundColor('#121212');
+
+            } catch (error) {
+                document.getElementById('loading').innerHTML = `<p style="color: red;">Ошибка загрузки: ${error.message}</p>`;
+            }
+        }
+
+        // Запуск
+        loadProfile();
+    </script>
+</body>
+</html>
