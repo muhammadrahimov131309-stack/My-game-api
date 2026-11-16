@@ -1,193 +1,165 @@
 import os
 import random
+import asyncio
 import asyncpg
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import Command
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+
 load_dotenv()
-app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://your-app.pages.dev")
+
 pool = None
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-# --- КОНСТАНТЫ ИГРЫ ---
-SHOP_ITEMS = {
-    1: {"name": "Кепка новичка", "price": 5000, "emoji": "🧢"},
-    2: {"name": "Золотые часы", "price": 50000, "emoji": "⌚"},
-    3: {"name": "Лада Приора", "price": 200000, "emoji": "🚗"},
-    4: {"name": "BMW M5", "price": 2000000, "emoji": "🏎️"},
-    5: {"name": "Lamborghini", "price": 15000000, "emoji": "🔥"},
-}
-
-BIZ_TYPES = {
-    "tent": {"name": "Палатка", "price": 50000, "income": 1000, "max": 10},
-    "shop": {"name": "Магазин", "price": 250000, "income": 6000, "max": 15},
-}
+class Reg(StatesGroup):
+    waiting_nickname = State()
 
 # --- БАЗА ДАННЫХ ---
-@app.on_event("startup")
-async def startup():
+async def init_db():
     global pool
     dsn = DATABASE_URL.replace("?sslmode=require", "?ssl=true")
     pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
     async with pool.acquire() as conn:
-        # Автосоздание таблиц при первом запуске
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                tg_id BIGINT PRIMARY KEY, nickname TEXT, balance BIGINT DEFAULT 10000, 
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                tg_id BIGINT PRIMARY KEY, nickname TEXT UNIQUE, balance BIGINT DEFAULT 10000, 
+                level INT DEFAULT 1, xp INT DEFAULT 0, gang_id INT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS inventory (
-                id SERIAL PRIMARY KEY, tg_id BIGINT, item_id INT
+                id SERIAL PRIMARY KEY, tg_id BIGINT, item_id INT, rarity TEXT, acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-            CREATE TABLE IF NOT EXISTS daily (
+            CREATE TABLE IF NOT EXISTS daily_rewards (
                 tg_id BIGINT PRIMARY KEY, last_claim DATE, streak INT DEFAULT 0
-            );
-            CREATE TABLE IF NOT EXISTS businesses (
-                id SERIAL PRIMARY KEY, tg_id BIGINT, type TEXT, level INT DEFAULT 1, last_collect TIMESTAMP
             );
         """)
 
-@app.on_event("shutdown")
-async def shutdown():
-    if pool: await pool.close()
+async def get_user_db(tg_id):
+    async with pool.acquire() as conn:
+        return await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", tg_id)
 
-# --- УТИЛИТЫ ---
-def fmt(n): return f"{n:,}".replace(",", " ")
+# ==========================================
+# ЧАСТЬ 1: ЛОГИКА БОТА (AIOGRAM)
+# ==========================================
 
-# --- ЭНДПОИНТЫ ПРОФИЛЯ ---
+def main_menu_kb():
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="💰 Баланс")],
+        [KeyboardButton(text="🎮 Открыть игру (Mini App)", web_app={"url": MINI_APP_URL})]
+    ], resize_keyboard=True)
+
+@dp.message(Command("start"))
+async def cmd_start(message: Message, state: FSMContext):
+    user = await get_user_db(message.from_user.id)
+    if user:
+        await message.answer(f"С возвращением, {user['nickname']}! Твой баланс: {user['balance']} 💰", reply_markup=main_menu_kb())
+    else:
+        await state.set_state(Reg.waiting_nickname)
+        await message.answer("Привет! Добро пожаловать в UNDERWORLD.\n\nКак тебя зовут, боец? Напиши свой ник:")
+
+@dp.message(Reg.waiting_nickname)
+async def process_nickname(message: Message, state: FSMContext):
+    nickname = message.text.strip()
+    if len(nickname) < 2 or len(nickname) > 20:
+        await message.answer("Ник должен быть от 2 до 20 символов. Попробуй ещё:")
+        return
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute("INSERT INTO users (tg_id, nickname) VALUES ($1, $2)", message.from_user.id, nickname)
+        await state.clear()
+        await message.answer(f"Добро пожаловать, {nickname}! Ты получаешь 10 000 монет 💰", reply_markup=main_menu_kb())
+    except asyncpg.UniqueViolationError:
+        await message.answer("Этот ник уже занят. Придумай другой:")
+
+@dp.message(F.text == "👤 Профиль")
+async def bot_profile(message: Message):
+    user = await get_user_db(message.from_user.id)
+    if not user: return await message.answer("Напиши /start")
+    await message.answer(f"👤 Ник: {user['nickname']}\n💰 Баланс: {user['balance']}\n📈 Уровень: {user['level']}")
+
+@dp.message(F.text == "💰 Баланс")
+async def bot_balance(message: Message):
+    user = await get_user_db(message.from_user.id)
+    if user: await message.answer(f"💰 Баланс: {user['balance']} монет")
+
+# ==========================================
+# ЧАСТЬ 2: API ДЛЯ MINI APP (FASTAPI)
+# ==========================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    asyncio.create_task(dp.start_polling(bot))
+    yield
+    await bot.session.close()
+    await pool.close()
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
 @app.get("/api/profile/{tg_id}")
-async def get_profile(tg_id: int):
+async def api_profile(tg_id: int):
+    user = await get_user_db(tg_id)
+    if not user: raise HTTPException(404, "Игрок не найден")
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT nickname, balance FROM users WHERE tg_id = $1", tg_id)
-        if not user: raise HTTPException(404, "Игрок не найден в базе")
-        
-        # Считаем место в топе
-        rank = await conn.fetchval("SELECT COUNT(*) FROM users WHERE balance > $1", user["balance"]) + 1
-        return {"tg_id": tg_id, "nickname": user["nickname"], "balance": user["balance"], "rank": rank}
+        rank = await conn.fetchval("SELECT COUNT(*) FROM users WHERE balance > $1", user['balance']) + 1
+    return {"nickname": user['nickname'], "balance": user['balance'], "rank": rank}
 
-# --- ДЕЙЛИКИ ---
 @app.post("/api/daily/{tg_id}")
-async def claim_daily(tg_id: int):
+async def api_daily(tg_id: int):
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT last_claim, streak FROM daily WHERE tg_id = $1", tg_id)
+        row = await conn.fetchrow("SELECT last_claim, streak FROM daily_rewards WHERE tg_id = $1", tg_id)
         today = date.today()
-        
-        if row and row["last_claim"] == today:
-            raise HTTPException(400, "Ты уже забирал награду сегодня!")
+        if row and row['last_claim'] == today:
+            raise HTTPException(400, "Уже забрал сегодня!")
         
         streak = 1
-        if row and row["last_claim"] == today - timedelta(days=1):
-            streak = row["streak"] + 1
+        if row and row['last_claim'] == today - timedelta(days=1):
+            streak = row['streak'] + 1
             
         reward = 5000 * streak
         await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", reward, tg_id)
         await conn.execute("""
-            INSERT INTO daily (tg_id, last_claim, streak) VALUES ($1, $2, $3)
+            INSERT INTO daily_rewards (tg_id, last_claim, streak) VALUES ($1, $2, $3)
             ON CONFLICT (tg_id) DO UPDATE SET last_claim = $2, streak = $3
         """, tg_id, today, streak)
         
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", tg_id)
-        return {"status": "ok", "reward": reward, "streak": streak, "new_balance": new_bal}
+        return {"status": "ok", "reward": reward, "new_balance": new_bal}
 
-# --- МАГАЗИН И ИНВЕНТАРЬ ---
-@app.get("/api/shop")
-async def get_shop():
-    return {"items": [{"id": k, **v} for k, v in SHOP_ITEMS.items()]}
-
-class BuyRequest(BaseModel):
-    tg_id: int
-    item_id: int
-
-@app.post("/api/shop/buy")
-async def buy_item(req: BuyRequest):
-    item = SHOP_ITEMS.get(req.item_id)
-    if not item: raise HTTPException(404, "Товар не найден")
-    async with pool.acquire() as conn:
-        bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
-        if bal < item["price"]: raise HTTPException(400, "Недостаточно монет!")
-        
-        await conn.execute("UPDATE users SET balance = balance - $1 WHERE tg_id = $2", item["price"], req.tg_id)
-        await conn.execute("INSERT INTO inventory (tg_id, item_id) VALUES ($1, $2)", req.tg_id, req.item_id)
-        new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
-        return {"status": "ok", "new_balance": new_bal, "message": f"Куплено: {item['name']}"}
-
-@app.get("/api/inventory/{tg_id}")
-async def get_inventory(tg_id: int):
-    async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT id, item_id FROM inventory WHERE tg_id = $1", tg_id)
-        return {"items": [{"inv_id": r["id"], **SHOP_ITEMS[r["item_id"]]} for r in rows]}
-
-# --- КАЗИНО (АПГРЕЙДЕР) ---
 class UpgRequest(BaseModel):
     tg_id: int
     bet: int
     mult: float
 
 @app.post("/api/casino/upgrader")
-async def play_upg(req: UpgRequest):
+async def api_upgrader(req: UpgRequest):
     async with pool.acquire() as conn:
         bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
-        if bal < req.bet or req.bet < 100: raise HTTPException(400, "Ошибка ставки!")
+        if bal < req.bet: raise HTTPException(400, "Мало денег!")
         
         chance = round(90 / req.mult)
         roll = random.randint(1, 100)
-        
+        win = 0
         if roll <= chance:
             win = int(req.bet * (req.mult - 1))
             await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", win, req.tg_id)
-            res = "win"
         else:
             await conn.execute("UPDATE users SET balance = balance - $1 WHERE tg_id = $2", req.bet, req.tg_id)
-            res = "lose"
-            
+        
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
-        return {"result": res, "roll": roll, "chance": chance, "new_balance": new_bal}
-
-# --- РАБОТА: БИЗНЕСЫ ---
-@app.get("/api/businesses/{tg_id}")
-async def get_bizes(tg_id: int):
-    async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT id, type, level, last_collect FROM businesses WHERE tg_id = $1", tg_id)
-        res = []
-        for r in rows:
-            biz = BIZ_TYPES[r["type"]]
-            # Считаем доход
-            sec_passed = (datetime.now() - r["last_collect"]).total_seconds()
-            max_sec = 24 * 3600
-            eff_sec = min(sec_passed, max_sec)
-            income = int((biz["income"] * r["level"] / 3600) * eff_sec)
-            
-            res.append({
-                "id": r["id"], "name": biz["name"], "level": r["level"], 
-                "income_per_hour": biz["income"] * r["level"], "pending": income
-            })
-        return {"businesses": res}
-
-@app.post("/api/businesses/collect/{biz_id}")
-async def collect_biz(biz_id: int):
-    async with pool.acquire() as conn:
-        r = await conn.fetchrow("SELECT tg_id, type, level, last_collect FROM businesses WHERE id = $1", biz_id)
-        if not r: raise HTTPException(404, "Не найдено")
-        
-        biz = BIZ_TYPES[r["type"]]
-        sec_passed = (datetime.now() - r["last_collect"]).total_seconds()
-        income = int((biz["income"] * r["level"] / 3600) * min(sec_passed, 86400))
-        
-        if income > 0:
-            await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", income, r["tg_id"])
-            await conn.execute("UPDATE businesses SET last_collect = $1 WHERE id = $2", datetime.now(), biz_id)
-            
-        new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", r["tg_id"])
-        return {"status": "ok", "collected": income, "new_balance": new_bal}
-
-# --- РЕЙТИНГ ---
-@app.get("/api/rating")
-async def get_rating():
-    async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT nickname, balance FROM users ORDER BY balance DESC LIMIT 10")
-        return {"top": [{"nickname": r["nickname"], "balance": r["balance"]} for r in rows]}  
+        return {"result": "win" if win > 0 else "lose", "roll": roll, "new_balance": new_bal}
