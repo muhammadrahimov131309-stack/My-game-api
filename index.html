@@ -1,164 +1,193 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>UNDERWORLD: RPG</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>UNDERWORLD: Вселенная</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; font-family:'Inter', system-ui, sans-serif; }
+  :root{
+    --bg:#0a0b14; --card:#12142400; --line:rgba(120,140,255,.14);
+    --gold:#ffd166; --neon:#7c5cff; --neon2:#00e5ff; --pink:#ff3d81;
+    --green:#2bff88; --txt:#eef0ff; --dim:#8b90b5;
+  }
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.25), transparent 60%),
+      radial-gradient(900px 500px at -10% 30%, rgba(0,229,255,.14), transparent 55%),
+      radial-gradient(700px 700px at 50% 120%, rgba(255,61,129,.10), transparent 60%),
+      var(--bg);
+    color:var(--txt); min-height:100vh; padding-bottom:100px; overflow-x:hidden;
+  }
+  .wrap{max-width:520px; margin:0 auto; padding:14px 14px 0;}
 
-        :root {
-            --bg: #08080B; --surface: rgba(22, 22, 28, 0.7); --surface-solid: #16161C;
-            --surface-light: #22222A; --border: rgba(255, 255, 255, 0.08);
-            --accent: #00FFB2; --purple: #9D4EDD; --gold: #FFD60A;
-            --danger: #FF3366; --text: #FFFFFF; --text-muted: #8A8A93;
-            --nav-bg: rgba(15, 15, 20, 0.9);
-        }
+  /* --- СКРЫТИЕ ЭКРАНОВ --- */
+  .screen { display: none; animation: fadeIn 0.3s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-        
-        body {
-            margin: 0; padding: 0; padding-bottom: 110px;
-            background-color: var(--bg); color: var(--text);
-            font-family: 'Inter', sans-serif; overflow-x: hidden;
-            background-image: radial-gradient(circle at 50% 0%, rgba(157, 78, 221, 0.1) 0%, transparent 50%);
-            background-attachment: fixed;
-        }
+  /* ===== ШАПКА ПРОФИЛЯ ===== */
+  .hero{
+    position:relative; overflow:hidden;
+    background:linear-gradient(140deg, rgba(124,92,255,.22), rgba(0,229,255,.10) 60%, rgba(255,61,129,.14));
+    border:1px solid var(--line); border-radius:22px; padding:16px; margin-top:6px;
+    box-shadow:0 10px 40px rgba(124,92,255,.18); margin-bottom:14px;
+  }
+  .hero::before{
+    content:''; position:absolute; top:-60px; right:-40px; width:180px; height:180px;
+    background:radial-gradient(circle, rgba(124,92,255,.45), transparent 70%); filter:blur(10px);
+  }
+  .row{display:flex; align-items:center; gap:12px; position:relative;}
+  .avatar{
+    width:56px; height:56px; border-radius:18px; flex:none;
+    background:linear-gradient(135deg,#7c5cff,#00e5ff);
+    display:flex; align-items:center; justify-content:center; font-size:26px;
+    box-shadow:0 0 18px rgba(124,92,255,.55); border:2px solid rgba(255,255,255,.18);
+  }
+  .nick{font-size:19px; font-weight:800; letter-spacing:.3px;}
+  .lvl-chip{
+    display:inline-flex; align-items:center; gap:5px; margin-top:4px;
+    background:rgba(255,255,255,.08); border:1px solid var(--line);
+    padding:3px 10px; border-radius:99px; font-size:12px; font-weight:700; color:var(--gold);
+  }
+  .spacer{flex:1;}
+  .id-chip{ font-size:11px; color:var(--dim); background:rgba(255,255,255,.05); border:1px solid var(--line); padding:4px 9px; border-radius:99px; }
+  .xpbar{height:8px; border-radius:99px; background:rgba(255,255,255,.08); margin-top:12px; overflow:hidden;}
+  .xpbar > div{height:100%; width:35%; border-radius:99px; background:linear-gradient(90deg,#00e5ff,#7c5cff,#ff3d81); box-shadow:0 0 10px rgba(124,92,255,.8);}
 
-        h1, h2, h3, .font-display { font-family: 'Space Grotesk', sans-serif; }
+  /* ===== БАЛАНС ===== */
+  .balance{
+    margin-top:14px; text-align:center; padding:20px 16px;
+    background:linear-gradient(160deg, rgba(255,209,102,.14), rgba(255,209,102,.03));
+    border:1px solid rgba(255,209,102,.35); border-radius:22px; position:relative; overflow:hidden; margin-bottom:14px;
+  }
+  .balance::after{
+    content:''; position:absolute; inset:-40%;
+    background:conic-gradient(from 0deg, transparent 0 320deg, rgba(255,209,102,.25) 345deg, transparent 360deg);
+    animation:spin 6s linear infinite; pointer-events:none;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .bal-label{font-size:12px; color:var(--dim); letter-spacing:2px; text-transform:uppercase; position:relative;}
+  .bal-value{ font-size:38px; font-weight:900; position:relative; margin-top:4px; background:linear-gradient(90deg,#ffe9a8,#ffd166,#ffb347); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 14px rgba(255,209,102,.35)); }
+  .bal-btns{display:flex; gap:10px; margin-top:14px; position:relative;}
+  
+  .btn{ flex:1; border:none; border-radius:14px; padding:12px 0; font-weight:800; font-size:14px; cursor:pointer; transition:transform .08s; font-family:inherit; }
+  .btn:active{transform:scale(.96);}
+  .btn-gold{background:linear-gradient(90deg,#ffb347,#ffd166); color:#241a00; box-shadow:0 6px 20px rgba(255,209,102,.35);}
+  .btn-ghost{background:rgba(255,255,255,.07); color:var(--txt); border:1px solid var(--line);}
+  .btn-primary { background: linear-gradient(90deg, #7c5cff, #00e5ff); color: #fff; border: none; }
 
-        /* --- ЭКРАНЫ --- */
-        .screen { display: none; padding: 20px 0; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .screen.active { display: block; }
-        .padding-x { padding: 0 16px; }
-        
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  /* ===== СТАТЫ ===== */
+  .stats{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; margin-bottom:14px;}
+  .stat{ background:rgba(255,255,255,.045); border:1px solid var(--line); border-radius:18px; padding:13px 8px; text-align:center; position:relative; overflow:hidden; }
+  .stat .ic{font-size:20px;}
+  .stat .v{font-size:16px; font-weight:800; margin-top:4px;}
+  .stat .l{font-size:11px; color:var(--dim); margin-top:2px;}
+  .stat.rang .v{color:var(--neon2); text-shadow:0 0 12px rgba(0,229,255,.5);}
+  .stat.gang .v{color:var(--pink); text-shadow:0 0 12px rgba(255,61,129,.4);}
+  .stat.lvl .v{color:var(--green); text-shadow:0 0 12px rgba(43,255,136,.4);}
 
-        .header-title { font-size: 28px; font-weight: 700; margin: 0 0 20px 0; letter-spacing: -0.5px; display: flex; justify-content: space-between; align-items: center; }
-        .header-title span { color: var(--accent); }
+  /* ===== СЕКЦИИ ===== */
+  .sec{margin-top:16px;}
+  .sec-head{display:flex; align-items:center; margin:0 2px 8px;}
+  .sec-title{font-size:14px; font-weight:800; letter-spacing:.4px;}
+  .sec-more{margin-left:auto; font-size:12px; color:var(--neon2); text-decoration:none;}
 
-        /* --- ГЛАВНАЯ --- */
-        .user-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding: 0 16px; }
-        .avatar-wrap { position: relative; width: 64px; height: 64px; }
-        .avatar { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(135deg, var(--purple), var(--accent)); padding: 2px; }
-        .avatar-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
-        .level-badge { position: absolute; bottom: -4px; right: -4px; background: var(--surface-solid); border: 2px solid var(--accent); color: var(--accent); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; }
-        .user-info { flex: 1; }
-        .user-info h2 { margin: 0; font-size: 20px; font-weight: 700; }
-        .xp-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 8px; overflow: hidden; }
-        .xp-fill { width: 65%; height: 100%; background: var(--accent); border-radius: 3px; box-shadow: 0 0 10px var(--accent); }
+  .card{ background:rgba(255,255,255,.045); border:1px solid var(--line); border-radius:20px; padding:14px; }
+  .duo{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .action{position:relative; overflow:hidden; cursor:pointer;}
+  .action .big{font-size:30px;}
+  .action .t{font-weight:800; margin-top:8px; font-size:14px;}
+  .action .d{font-size:11.5px; color:var(--dim); margin-top:3px; line-height:1.45;}
+  .action .pulse{ position:absolute; top:10px; right:10px; background:var(--pink); color:#fff; font-size:10px; font-weight:800; padding:3px 8px; border-radius:99px; box-shadow:0 0 12px rgba(255,61,129,.6); }
+  .action.daily{background:linear-gradient(150deg, rgba(43,255,136,.10), rgba(255,255,255,.04)); border-color:rgba(43,255,136,.3);}
+  .action.slot{background:linear-gradient(150deg, rgba(124,92,255,.14), rgba(255,255,255,.04)); border-color:rgba(124,92,255,.35);}
 
-        .balance-card { background: var(--surface); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 24px; padding: 24px; text-align: center; margin: 0 16px 24px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .balance-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; }
-        .balance-amount { font-size: 44px; font-weight: 700; margin: 8px 0 16px 0; font-family: 'Space Grotesk', sans-serif; }
-        .balance-amount span { color: var(--accent); font-size: 32px; }
-        
-        .btn { background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 14px; font-weight: 700; font-size: 14px; width: 100%; cursor: pointer; transition: 0.2s; }
-        .btn:active { transform: scale(0.97); background: rgba(255,255,255,0.15); }
-        .btn-primary { background: var(--accent); color: #000; border: none; box-shadow: 0 4px 15px rgba(0,255,178,0.3); }
+  /* ===== ИНВЕНТАРЬ ===== */
+  .inv{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+  .slot{ background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:14px; padding:10px 4px; text-align:center; }
+  .slot .e{font-size:24px;}
+  .slot .n{font-size:10px; color:var(--dim); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .r1{border-bottom:2px solid #2bff88;} .r2{border-bottom:2px solid #3aa0ff;}
+  .r3{border-bottom:2px solid #b04dff;} .r4{border-bottom:2px solid #ffa63d;}
 
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
-        .menu-tile { background: var(--surface); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; }
-        .menu-tile:active { transform: scale(0.95); background: var(--surface-hover); }
-        .menu-tile .icon { font-size: 28px; }
-        .menu-tile span { font-size: 13px; font-weight: 700; }
+  /* ===== ЛЕНТА ===== */
+  .feed .fitem{ display:flex; gap:10px; align-items:center; padding:9px 2px; border-bottom:1px dashed rgba(120,140,255,.12); font-size:13px; }
+  .feed .fitem:last-child{border-bottom:none;}
+  .fitem .fe{font-size:17px;}
+  .fitem .ft{color:var(--dim);}
+  .fitem .ft b{color:var(--txt); font-weight:700;}
 
-        /* --- МАГАЗИН --- */
-        .shop-section { margin-bottom: 25px; }
-        .shop-section-header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; margin-bottom: 12px; }
-        .shop-section-title { font-size: 20px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
-        .shop-section-link { color: #4da6ff; font-size: 14px; font-weight: 500; cursor: pointer; }
+  /* ===== МАГАЗИН (АДАПТИРОВАННЫЙ) ===== */
+  .shop-section { margin-bottom: 20px; }
+  .shop-carousel { display: flex; gap: 12px; overflow-x: auto; padding: 0 0 10px 0; scrollbar-width: none; }
+  .shop-carousel::-webkit-scrollbar { display: none; }
+  .shop-item { flex: 0 0 220px; cursor: pointer; display: flex; flex-direction: column; }
+  .shop-item-img { width: 100%; height: 180px; background: #ffffff; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+  .shop-item-img img { width: 100%; height: 100%; object-fit: contain; padding: 10px; }
+  .shop-item-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shop-item-price { font-size: 15px; font-weight: 800; color: var(--gold); margin-bottom: 4px; }
+  .shop-item-sub { font-size: 12px; color: var(--dim); }
 
-        .shop-carousel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 10px 16px; scrollbar-width: none; scroll-snap-type: x mandatory; }
-        .shop-carousel::-webkit-scrollbar { display: none; }
+  /* ===== ДЕТАЛЬНЫЙ ЭКРАН ===== */
+  #screen-item-detail { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; overflow-y: auto; padding-bottom: 30px; display: none; background: var(--bg); }
+  .back-btn { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; z-index: 10; cursor: pointer; backdrop-filter: blur(10px); }
+  .detail-img-container { width: 100%; height: 350px; background: #fff; display: flex; align-items: center; justify-content: center; }
+  .detail-img-container img { width: 100%; height: 100%; object-fit: contain; padding: 20px; }
+  .detail-content { padding: 20px; }
+  .detail-title { font-size: 24px; font-weight: 800; margin: 0 0 15px 0; }
+  .try-on-btn { width: 100%; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; margin-bottom: 20px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .detail-label { color: var(--dim); }
+  .detail-value { font-weight: 700; text-align: right; }
+  .big-price { font-size: 32px; font-weight: 900; color: var(--gold); }
 
-        .shop-item { flex: 0 0 260px; scroll-snap-align: start; cursor: pointer; display: flex; flex-direction: column; }
-        .shop-item-img { width: 100%; height: 220px; background: #ffffff; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .shop-item-img img { width: 100%; height: 100%; object-fit: contain; padding: 10px; }
-        
-        .shop-item-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
-        .shop-item-price { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-        .shop-item-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 2px; }
+  /* ===== КАЗИНО ===== */
+  .game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .game-card { border-radius: 20px; padding: 20px; height: 140px; cursor: pointer; border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between; }
+  .gc-upg { background: linear-gradient(135deg, rgba(124,92,255,.2), transparent); }
+  .gc-roul { background: linear-gradient(135deg, rgba(0,229,255,.2), transparent); }
+  .gc-pvp { background: linear-gradient(135deg, rgba(255,61,129,.2), transparent); }
+  .gc-mines { background: linear-gradient(135deg, rgba(255,209,102,.2), transparent); }
+  .game-card .icon { font-size: 36px; }
+  .game-card .title { font-size: 16px; font-weight: 800; }
 
-        /* --- ДЕТАЛЬНЫЙ ЭКРАН ПРЕДМЕТА --- */
-        #screen-item-detail { background: var(--bg); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; overflow-y: auto; padding-bottom: 30px; display: none; }
-        .back-btn { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; z-index: 10; cursor: pointer; backdrop-filter: blur(10px); }
-        
-        .detail-img-container { width: 100%; height: 380px; background: #fff; display: flex; align-items: center; justify-content: center; }
-        .detail-img-container img { width: 100%; height: 100%; object-fit: contain; padding: 20px; }
-        
-        .detail-content { padding: 20px 16px; }
-        .detail-title { font-size: 24px; font-weight: 700; margin: 0 0 15px 0; }
-        
-        .try-on-btn { width: 100%; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; margin-bottom: 20px; }
+  /* ===== РАБОТА ===== */
+  .work-card { background: rgba(255,255,255,.045); border: 1px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; }
+  .work-card .w-icon { font-size: 32px; }
+  .work-card .w-info { flex: 1; }
+  .work-card .w-info h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 800; }
+  .work-card .w-info p { margin: 0; font-size: 12px; color: var(--dim); }
 
-        .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
-        .detail-row:last-child { border: none; }
-        .detail-label { color: var(--text-muted); }
-        .detail-value { font-weight: 600; text-align: right; }
-        
-        .big-price { font-size: 32px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; margin-bottom: 5px; }
+  /* ===== РЕЙТИНГ ===== */
+  .top-list { background: rgba(255,255,255,.045); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+  .top-row { display: flex; align-items: center; padding: 16px; border-bottom: 1px solid var(--line); }
+  .top-row:last-child { border-bottom: none; }
+  .top-row.you { background: rgba(124,92,255,.1); border-left: 3px solid var(--neon); }
+  .top-pos { width: 30px; font-weight: 800; color: var(--gold); }
+  .top-name { flex: 1; font-weight: 700; font-size: 15px; }
+  .top-money { font-weight: 800; color: var(--green); font-size: 15px; }
 
-        .stats-block { background: var(--surface-solid); border-radius: 16px; padding: 15px; margin: 20px 0; }
-        .stats-title { font-size: 16px; font-weight: 700; margin: 0 0 10px 0; }
-        .stat-line { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 14px; color: #ddd; }
-        .stat-line:last-child { margin: 0; }
+  /* ===== ТАБ-БАР ===== */
+  .tabbar{ position:fixed; bottom:0; left:0; right:0; z-index:50; backdrop-filter:blur(16px); background:rgba(10,11,20,.82); border-top:1px solid var(--line); }
+  .tabbar .in{max-width:520px; margin:0 auto; display:grid; grid-template-columns:repeat(5,1fr); padding:8px 6px 12px;}
+  .tab{ text-align:center; text-decoration:none; color:var(--dim); font-size:10.5px; font-weight:700; padding:6px 0; border-radius:12px; transition:.15s; cursor:pointer; background:none; border:none; }
+  .tab .ti{font-size:21px; display:block; margin-bottom:2px; filter:grayscale(.6); transition:.15s;}
+  .tab.on{color:var(--txt);}
+  .tab.on .ti{filter:none; transform:translateY(-2px); text-shadow:0 0 14px rgba(124,92,255,.8);}
 
-        /* --- КАЗИНО --- */
-        .game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
-        .game-card { border-radius: 20px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; height: 140px; cursor: pointer; border: 1px solid var(--border); transition: 0.2s; }
-        .game-card:active { transform: scale(0.95); }
-        .gc-upg { background: linear-gradient(135deg, #1e1e2f, #2a0a3a); }
-        .gc-roul { background: linear-gradient(135deg, #1e1e2f, #0a2a3a); }
-        .gc-pvp { background: linear-gradient(135deg, #1e1e2f, #3a0a0a); }
-        .gc-mines { background: linear-gradient(135deg, #1e1e2f, #1a3a0a); }
-        .game-card .icon { font-size: 36px; }
-        .game-card .title { font-size: 16px; font-weight: 700; }
-        .game-card .sub { font-size: 11px; color: var(--text-muted); }
-
-        /* --- РАБОТА --- */
-        .work-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 18px; margin: 0 16px 12px 16px; display: flex; align-items: center; gap: 16px; }
-        .work-card .w-icon { font-size: 32px; }
-        .work-card .w-info { flex: 1; }
-        .work-card .w-info h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; }
-        .work-card .w-info p { margin: 0; font-size: 12px; color: var(--text-muted); }
-
-        /* --- РЕЙТИНГ --- */
-        .top-list { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin: 0 16px; }
-        .top-row { display: flex; align-items: center; padding: 16px; border-bottom: 1px solid var(--border); }
-        .top-row:last-child { border-bottom: none; }
-        .top-row.you { background: rgba(0, 255, 178, 0.05); border-left: 3px solid var(--accent); }
-        .top-pos { width: 30px; font-weight: 700; color: var(--text-muted); }
-        .top-name { flex: 1; font-weight: 600; font-size: 15px; }
-        .top-money { font-weight: 700; color: var(--accent); font-size: 15px; }
-
-        /* --- ПЛАВАЮЩЕЕ МЕНЮ --- */
-        .nav-container {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: calc(100% - 32px); max-width: 400px;
-            background: var(--nav-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-            border: 1px solid rgba(255,255,255,0.1); border-radius: 30px;
-            display: flex; justify-content: space-around; padding: 12px 10px;
-            z-index: 100; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        }
-        .nav-item { background: none; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: 0.3s; position: relative; padding: 5px 10px; }
-        .nav-item span { font-size: 22px; transition: 0.3s; }
-        .nav-item .label { font-size: 10px; font-weight: 700; opacity: 0; transform: translateY(5px); transition: 0.3s; position: absolute; bottom: -15px; }
-        .nav-item.active { color: var(--accent); }
-        .nav-item.active span { transform: translateY(-8px); }
-        .nav-item.active .label { opacity: 1; transform: translateY(0); }
-
-        /* --- BOTTOM SHEET --- */
-        .bottom-sheet-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); display: none; align-items: flex-end; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
-        .bottom-sheet-overlay.active { display: flex; opacity: 1; }
-        .bottom-sheet { background: var(--surface-solid); width: 100%; border-radius: 30px 30px 0 0; padding: 24px 20px 40px 20px; text-align: center; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); border-top: 1px solid var(--border); }
-        .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
-        .drag-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 20px auto; }
-        .bs-icon { font-size: 48px; margin-bottom: 12px; }
-        .bs-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; font-family: 'Space Grotesk', sans-serif; }
-        .bs-text { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; }
-    </style>
+  /* ===== BOTTOM SHEET ===== */
+  .bottom-sheet-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); display: none; align-items: flex-end; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
+  .bottom-sheet-overlay.active { display: flex; opacity: 1; }
+  .bottom-sheet { background: #121424; width: 100%; border-radius: 30px 30px 0 0; padding: 24px 20px 40px 20px; text-align: center; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); border-top: 1px solid var(--line); }
+  .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
+  .drag-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 20px auto; }
+  .bs-icon { font-size: 48px; margin-bottom: 12px; }
+  .bs-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+  .bs-text { font-size: 14px; color: var(--dim); margin-bottom: 24px; line-height: 1.5; }
+</style>
 </head>
 <body>
 
@@ -173,291 +202,259 @@
     </div>
 </div>
 
-<!-- 1. ГЛАВНАЯ -->
+<!-- ЭКРАН 1: ГЛАВНАЯ -->
 <div id="screen-home" class="screen active">
-    <div class="user-header">
-        <div class="avatar-wrap">
-            <div class="avatar"><div class="avatar-inner">V</div></div>
-            <div class="level-badge">LVL 12</div>
+  <div class="wrap">
+    <div class="hero">
+      <div class="row">
+        <div class="avatar">🎮</div>
+        <div>
+          <div class="nick">Вася</div>
+          <div class="lvl-chip">⚔️ Уровень 12</div>
         </div>
-        <div class="user-info">
-            <h2>Вася</h2>
-            <div class="xp-bg"><div class="xp-fill"></div></div>
-        </div>
+        <div class="spacer"></div>
+        <div class="id-chip">#7127</div>
+      </div>
+      <div class="xpbar"><div></div></div>
     </div>
 
-    <div class="balance-card">
-        <div class="balance-title">Твой капитал</div>
-        <div class="balance-amount">1.25M <span>💰</span></div>
-        <button class="btn btn-primary" onclick="openSheet('💳', 'Пополнение', 'Модуль оплаты в разработке.')">Пополнить баланс</button>
+    <div class="balance">
+      <div class="bal-label">Баланс</div>
+      <div class="bal-value">1 250 000 🪙</div>
+      <div class="bal-btns">
+        <button class="btn btn-gold" onclick="openSheet('💼', 'Заработать', 'Переход в раздел Работы...')">💼 Заработать</button>
+        <button class="btn btn-ghost" onclick="openTab('casino', document.querySelectorAll('.tab')[2])">🎰 В казино</button>
+      </div>
     </div>
 
-    <div class="grid-2">
-        <div class="menu-tile" onclick="openSheet('🎁', 'Награды', 'Ты заходишь 3-й день подряд! Забери 25 000 монет.')">
-            <div class="icon">🎁</div><span>Награды</span>
-        </div>
-        <div class="menu-tile" onclick="openSheet('🎰', 'Слот дня', 'Бесплатная прокрутка доступна. Испытай удачу!')">
-            <div class="icon">🎰</div><span>Слот дня</span>
-        </div>
-        <div class="menu-tile" onclick="openSheet('🏴', 'Банда', 'Ты состоишь в банде SHADOW. Ранг: Рядовой.')">
-            <div class="icon">🏴</div><span>Банда</span>
-        </div>
-        <div class="menu-tile" onclick="openSheet('🎒', 'Инвентарь', 'У тебя 5 предметов. Последний: Кожаная куртка.')">
-            <div class="icon">🎒</div><span>Инвентарь</span>
-        </div>
+    <div class="stats">
+      <div class="stat rang"><div class="ic">🏆</div><div class="v">#1234</div><div class="l">Топ</div></div>
+      <div class="stat gang"><div class="ic">🏴</div><div class="v">SHADOW</div><div class="l">Банда</div></div>
+      <div class="stat lvl"><div class="ic">✨</div><div class="v">450</div><div class="l">XP</div></div>
     </div>
+
+    <div class="sec">
+      <div class="sec-head"><div class="sec-title">🔥 Ежедневки</div></div>
+      <div class="duo">
+        <div class="card action daily" onclick="openSheet('🎁', 'Награды', 'Ты заходишь 3-й день подряд! Забери 25 000 монет.')">
+          <div class="pulse">ГОТОВО</div>
+          <div class="big">🎁</div>
+          <div class="t">День 3/30</div>
+          <div class="d">Забери 25 000 монет.</div>
+        </div>
+        <div class="card action slot" onclick="openSheet('🎰', 'Слот дня', 'Бесплатная прокрутка доступна!')">
+          <div class="pulse">1 КРУТ</div>
+          <div class="big">🎰</div>
+          <div class="t">Слот дня</div>
+          <div class="d">До 1% джекпота!</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><div class="sec-title">🎒 Инвентарь</div><a class="sec-more" href="#">открыть всё →</a></div>
+      <div class="card inv">
+        <div class="slot r1"><div class="e">🧢</div><div class="n">Кепка</div></div>
+        <div class="slot r1"><div class="e">👕</div><div class="n">Боец</div></div>
+        <div class="slot r2"><div class="e">🧥</div><div class="n">Куртка</div></div>
+        <div class="slot"><div class="e">➕</div><div class="n">Открыть</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><div class="sec-title">📰 События</div><a class="sec-more" href="#">все →</a></div>
+      <div class="card feed">
+        <div class="fitem"><div class="fe">🎰</div><div class="ft"><b>Игрок_1</b> сорвал джекпот ×50 в рулетке!</div></div>
+        <div class="fitem"><div class="fe">🚗</div><div class="ft"><b>Игрок_2</b> купил Ламбо</div></div>
+        <div class="fitem"><div class="fe">🎉</div><div class="ft"><b>Игрок_3</b> получил легендарный скин</div></div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- 2. МАГАЗИН -->
+<!-- ЭКРАН 2: МАГАЗИН -->
 <div id="screen-shop" class="screen">
-    <div class="padding-x"><div class="header-title">Магазин<span>.</span></div></div>
+  <div class="wrap">
+    <div class="sec-head" style="margin-bottom:15px; margin-top:10px;"><div class="sec-title" style="font-size:24px;">Магазин</div></div>
     
-    <!-- Блок 1: ТАЧКИ -->
     <div class="shop-section">
-        <div class="shop-section-header">
-            <h2 class="shop-section-title">Элитный автопарк 🏎️</h2>
-            <div class="shop-section-link">Показать все</div>
+      <div class="sec-head"><div class="sec-title">🏎️ Автопарк</div></div>
+      <div class="shop-carousel">
+        <div class="shop-item" onclick="openItemDetail('Красная Звезда', '15 000 000 🪙', '1.jpg', 'Легендарный', 'Скорость 350')">
+          <div class="shop-item-img"><img src="1.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=1.jpg'"></div>
+          <div class="shop-item-title">Красная Звезда</div>
+          <div class="shop-item-price">15 000 000 🪙</div>
         </div>
-        <div class="shop-carousel">
-            
-            <div class="shop-item" onclick="openItemDetail('Красная Звезда', '15 000 000 💰', '1.jpg', 'Легендарный', 'Скорость 350')">
-                <div class="shop-item-img">
-                    <img src="1.jpg" alt="Красная Звезда" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Красная+Звезда'">
-                </div>
-                <div class="shop-item-title">Красная Звезда</div>
-                <div class="shop-item-price">15 000 000 💰</div>
-                <div class="shop-item-sub">Скорость — 350</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Неизвестный зверь', '25 000 000 💰', '2.jpg', 'Эпический', 'Скорость 380')">
-                <div class="shop-item-img">
-                    <img src="2.jpg" alt="Неизвестный зверь" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Неизвестный+зверь'">
-                </div>
-                <div class="shop-item-title">Неизвестный зверь</div>
-                <div class="shop-item-price">25 000 000 💰</div>
-                <div class="shop-item-sub">Скорость — 380</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Черная Молния', '50 000 000 💰', '3.jpg', 'Мифический', 'Скорость 420')">
-                <div class="shop-item-img">
-                    <img src="3.jpg" alt="Черная Молния" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Черная+Молния'">
-                </div>
-                <div class="shop-item-title">Черная Молния</div>
-                <div class="shop-item-price">50 000 000 💰</div>
-                <div class="shop-item-sub">Скорость — 420</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Бугатти', '1 000 000 💰', '4.jpg', 'Редкий', 'Мемность 1000')">
-                <div class="shop-item-img">
-                    <img src="4.jpg" alt="Бугатти" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Бугатти'">
-                </div>
-                <div class="shop-item-title">Бугатти</div>
-                <div class="shop-item-price">1 000 000 💰</div>
-                <div class="shop-item-sub">Мемность — 1000</div>
-            </div>
-
+        <div class="shop-item" onclick="openItemDetail('Неизвестный зверь', '25 000 000 🪙', '2.jpg', 'Эпический', 'Скорость 380')">
+          <div class="shop-item-img"><img src="2.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=2.jpg'"></div>
+          <div class="shop-item-title">Неизвестный зверь</div>
+          <div class="shop-item-price">25 000 000 🪙</div>
         </div>
+        <div class="shop-item" onclick="openItemDetail('Черная Молния', '50 000 000 🪙', '3.jpg', 'Мифический', 'Скорость 420')">
+          <div class="shop-item-img"><img src="3.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=3.jpg'"></div>
+          <div class="shop-item-title">Черная Молния</div>
+          <div class="shop-item-price">50 000 000 🪙</div>
+        </div>
+        <div class="shop-item" onclick="openItemDetail('Бугатти', '1 000 000 🪙', '4.jpg', 'Редкий', 'Мемность 1000')">
+          <div class="shop-item-img"><img src="4.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=4.jpg'"></div>
+          <div class="shop-item-title">Бугатти</div>
+          <div class="shop-item-price">1 000 000 🪙</div>
+        </div>
+      </div>
     </div>
 
-    <!-- Блок 2: КОЛЛЕКЦИЯ -->
     <div class="shop-section">
-        <div class="shop-section-header">
-            <h2 class="shop-section-title">Коллекция 🔥</h2>
-            <div class="shop-section-link">Показать все</div>
+      <div class="sec-head"><div class="sec-title">🔥 Коллекция</div></div>
+      <div class="shop-carousel">
+        <div class="shop-item" onclick="openItemDetail('Маска Декстера', '5 000 000 🪙', '5.jpg', 'Легендарный', 'Защита 800')">
+          <div class="shop-item-img"><img src="5.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=5.jpg'"></div>
+          <div class="shop-item-title">Маска Декстера</div>
+          <div class="shop-item-price">5 000 000 🪙</div>
         </div>
-        <div class="shop-carousel">
-
-            <div class="shop-item" onclick="openItemDetail('Маска Декстера Моргана', '5 000 000 💰', '5.jpg', 'Легендарный', 'Защита 800')">
-                <div class="shop-item-img">
-                    <img src="5.jpg" alt="Маска Декстера Моргана" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Маска'">
-                </div>
-                <div class="shop-item-title">Маска Декстера Моргана</div>
-                <div class="shop-item-price">5 000 000 💰</div>
-                <div class="shop-item-sub">Защита — 800</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Стендоффер 5', '10 000 000 💰', '6.jpg', 'Эпический', 'Удача +50')">
-                <div class="shop-item-img">
-                    <img src="6.jpg" alt="Стендоффер 5" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Стендоффер'">
-                </div>
-                <div class="shop-item-title">Стендоффер 5</div>
-                <div class="shop-item-price">10 000 000 💰</div>
-                <div class="shop-item-sub">Удача — +50</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Анимешница', '500 000 💰', '7.jpg', 'Редкий', 'Стиль +100')">
-                <div class="shop-item-img">
-                    <img src="7.jpg" alt="Анимешница" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Анимешница'">
-                </div>
-                <div class="shop-item-title">Анимешница</div>
-                <div class="shop-item-price">500 000 💰</div>
-                <div class="shop-item-sub">Стиль — +100</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Растишка', '1 500 000 💰', '8.jpg', 'Обычный', 'Милота +999')">
-                <div class="shop-item-img">
-                    <img src="8.jpg" alt="Растишка" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Растишка'">
-                </div>
-                <div class="shop-item-title">Растишка</div>
-                <div class="shop-item-price">1 500 000 💰</div>
-                <div class="shop-item-sub">Милота — +999</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Павел Валерьевич', '100 000 000 💰', '9.jpg', 'Мифический', 'Влияние 1000')">
-                <div class="shop-item-img">
-                    <img src="9.jpg" alt="Павел Валерьевич" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Павел+Валерьевич'">
-                </div>
-                <div class="shop-item-title">Павел Валерьевич</div>
-                <div class="shop-item-price">100 000 000 💰</div>
-                <div class="shop-item-sub">Влияние — 1000</div>
-            </div>
-
-            <div class="shop-item" onclick="openItemDetail('Скамграм', '5 000 000 💰', '10.jpg', 'Эпический', 'Хитрость +100')">
-                <div class="shop-item-img">
-                    <img src="10.jpg" alt="Скамграм" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Скамграм'">
-                </div>
-                <div class="shop-item-title">Скамграм</div>
-                <div class="shop-item-price">5 000 000 💰</div>
-                <div class="shop-item-sub">Хитрость — +100</div>
-            </div>
-
+        <div class="shop-item" onclick="openItemDetail('Стендоффер 5', '10 000 000 🪙', '6.jpg', 'Эпический', 'Удача +50')">
+          <div class="shop-item-img"><img src="6.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=6.jpg'"></div>
+          <div class="shop-item-title">Стендоффер 5</div>
+          <div class="shop-item-price">10 000 000 🪙</div>
         </div>
+        <div class="shop-item" onclick="openItemDetail('Анимешница', '500 000 🪙', '7.jpg', 'Редкий', 'Стиль +100')">
+          <div class="shop-item-img"><img src="7.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=7.jpg'"></div>
+          <div class="shop-item-title">Анимешница</div>
+          <div class="shop-item-price">500 000 🪙</div>
+        </div>
+        <div class="shop-item" onclick="openItemDetail('Растишка', '1 500 000 🪙', '8.jpg', 'Обычный', 'Милота +999')">
+          <div class="shop-item-img"><img src="8.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=8.jpg'"></div>
+          <div class="shop-item-title">Растишка</div>
+          <div class="shop-item-price">1 500 000 🪙</div>
+        </div>
+        <div class="shop-item" onclick="openItemDetail('Павел Валерьевич', '100 000 000 🪙', '9.jpg', 'Мифический', 'Влияние 1000')">
+          <div class="shop-item-img"><img src="9.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=9.jpg'"></div>
+          <div class="shop-item-title">Павел Валерьевич</div>
+          <div class="shop-item-price">100 000 000 🪙</div>
+        </div>
+        <div class="shop-item" onclick="openItemDetail('Скамграм', '5 000 000 🪙', '10.jpg', 'Эпический', 'Хитрость +100')">
+          <div class="shop-item-img"><img src="10.jpg" onerror="this.src='https://placehold.co/400x300/fff/000?text=10.jpg'"></div>
+          <div class="shop-item-title">Скамграм</div>
+          <div class="shop-item-price">5 000 000 🪙</div>
+        </div>
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- 3. ДЕТАЛЬНЫЙ ЭКРАН -->
+<!-- ЭКРАН: ДЕТАЛИ ПРЕДМЕТА -->
 <div id="screen-item-detail">
-    <button class="back-btn" onclick="closeItemDetail()">←</button>
-    <div class="detail-img-container">
-        <img id="detail-img" src="" alt="Item">
-    </div>
-    <div class="detail-content">
-        <h1 class="detail-title" id="detail-title">Название</h1>
-        
-        <button class="try-on-btn" onclick="openSheet('👕', 'Примерка', 'Предмет надет. Выглядит стильно!')">
-            <span>👕</span> Примерить
-        </button>
-
-        <div class="detail-row">
-            <div class="detail-label">Цена</div>
-            <div class="detail-value">
-                <div class="big-price" id="detail-price">0</div>
-            </div>
-        </div>
-        <div class="detail-row">
-            <div class="detail-label">Редкость</div>
-            <div class="detail-value" id="detail-rarity">Обычный</div>
-        </div>
-
-        <div class="stats-block">
-            <h3 class="stats-title">Характеристики</h3>
-            <div class="stat-line"><span>🛡️</span> Защита — <span id="detail-stat1">800</span></div>
-            <div class="stat-line"><span>⚡</span> Бонус — <span id="detail-stat2">100</span></div>
-        </div>
-        
-        <button class="btn btn-primary" style="margin-top: 20px;" onclick="openSheet('✅', 'Покупка', 'Предмет куплен (демо)')">Купить сейчас</button>
-    </div>
+  <button class="back-btn" onclick="closeItemDetail()">←</button>
+  <div class="detail-img-container"><img id="detail-img" src=""></div>
+  <div class="detail-content">
+    <h1 class="detail-title" id="detail-title">Название</h1>
+    <button class="try-on-btn" onclick="openSheet('👕', 'Примерка', 'Предмет надет!')"><span>👕</span> Примерить</button>
+    <div class="detail-row"><div class="detail-label">Цена</div><div class="detail-value"><div class="big-price" id="detail-price">0</div></div></div>
+    <div class="detail-row"><div class="detail-label">Редкость</div><div class="detail-value" id="detail-rarity">Обычный</div></div>
+    <div class="detail-row"><div class="detail-label">Характеристики</div><div class="detail-value" id="detail-stat2">100</div></div>
+    <button class="btn btn-gold" style="margin-top: 20px;" onclick="openSheet('✅', 'Покупка', 'Предмет куплен (демо)')">Купить сейчас</button>
+  </div>
 </div>
 
-<!-- 4. КАЗИНО -->
+<!-- ЭКРАН 3: КАЗИНО -->
 <div id="screen-casino" class="screen">
-    <div class="padding-x"><div class="header-title">Казино<span>.</span></div></div>
+  <div class="wrap">
+    <div class="sec-head" style="margin-bottom:15px; margin-top:10px;"><div class="sec-title" style="font-size:24px;">Казино</div></div>
     <div class="game-grid">
-        <div class="game-card gc-upg" onclick="openSheet('📈', 'Апгрейдер', 'Здесь будет выбор ставки и множителя.')"><div class="icon">📈</div><div><div class="title">Апгрейдер</div><div class="sub">до x10</div></div></div>
-        <div class="game-card gc-roul" onclick="openSheet('🎡', 'Рулетка', 'Колесо фортуны с джекпотом.')"><div class="icon">🎡</div><div><div class="title">Рулетка</div><div class="sub">шанс x50</div></div></div>
-        <div class="game-card gc-pvp" onclick="openSheet('🎯', 'PVP Арена', 'Сразись 1 на 1 за общий банк.')"><div class="icon">🎯</div><div><div class="title">PVP</div><div class="sub">1 vs 1</div></div></div>
-        <div class="game-card gc-mines" onclick="openSheet('💣', 'Мины', 'Поле 5х5. Найди монеты, но бойся мин.')"><div class="icon">💣</div><div><div class="title">Мины</div><div class="sub">x200 макс</div></div></div>
+      <div class="game-card gc-upg" onclick="openSheet('📈', 'Апгрейдер', 'Здесь будет выбор ставки и множителя.')"><div class="icon">📈</div><div class="title">Апгрейдер</div></div>
+      <div class="game-card gc-roul" onclick="openSheet('🎡', 'Рулетка', 'Колесо фортуны.')"><div class="icon">🎡</div><div class="title">Рулетка</div></div>
+      <div class="game-card gc-pvp" onclick="openSheet('🎯', 'PVP', 'Сразись 1 на 1.')"><div class="icon">🎯</div><div class="title">PVP Арена</div></div>
+      <div class="game-card gc-mines" onclick="openSheet('💣', 'Мины', 'Найди монеты, но бойся мин.')"><div class="icon">💣</div><div class="title">Мины</div></div>
     </div>
+  </div>
 </div>
 
-<!-- 5. РАБОТА -->
+<!-- ЭКРАН 4: РАБОТА -->
 <div id="screen-work" class="screen">
-    <div class="padding-x"><div class="header-title">Работа<span>.</span></div></div>
+  <div class="wrap">
+    <div class="sec-head" style="margin-bottom:15px; margin-top:10px;"><div class="sec-title" style="font-size:24px;">Работа</div></div>
     <div class="work-card">
-        <div class="w-icon">🌾</div>
-        <div class="w-info"><h4>Ферма кротов</h4><p>Доход: до 50 000 💰 за сессию</p></div>
-        <button class="btn" style="width: auto; padding: 10px 16px; background: var(--accent); color: #000;" onclick="openSheet('🌾', 'Запуск', 'Начинаем тапать кротов!')">Играть</button>
+      <div class="w-icon">🌾</div>
+      <div class="w-info"><h4>Ферма кротов</h4><p>Доход до 50 000 🪙</p></div>
+      <button class="btn btn-ghost" style="flex:0; padding:10px 16px;" onclick="openSheet('🌾', 'Запуск', 'Начинаем!')">Играть</button>
     </div>
     <div class="work-card">
-        <div class="w-icon">🏢</div>
-        <div class="w-info"><h4>Мои бизнесы</h4><p>Накоплено: 15 400 💰</p></div>
-        <button class="btn" style="width: auto; padding: 10px 16px;" onclick="openSheet('💵', 'Собрано', 'Ты забрал 15 400 монет с бизнесов.')">Забрать</button>
+      <div class="w-icon">🏢</div>
+      <div class="w-info"><h4>Мои бизнесы</h4><p>Накоплено: 15 400 🪙</p></div>
+      <button class="btn btn-gold" style="flex:0; padding:10px 16px;" onclick="openSheet('💵', 'Собрано', 'Забрал 15 400!')">Забрать</button>
     </div>
-    <div class="work-card" style="opacity: 0.6;">
-        <div class="w-icon">🔧</div>
-        <div class="w-info"><h4>Механик</h4><p>Мини-игра на скорость</p></div>
-        <button class="btn" style="width: auto; padding: 10px 16px;" disabled>Скоро</button>
-    </div>
+  </div>
 </div>
 
-<!-- 6. РЕЙТИНГ -->
+<!-- ЭКРАН 5: РЕЙТИНГ -->
 <div id="screen-rating" class="screen">
-    <div class="padding-x"><div class="header-title">Рейтинг<span>.</span></div></div>
+  <div class="wrap">
+    <div class="sec-head" style="margin-bottom:15px; margin-top:10px;"><div class="sec-title" style="font-size:24px;">Рейтинг</div></div>
     <div class="top-list">
-        <div class="top-row"><div class="top-pos">🥇</div><div class="top-name">Макс</div><div class="top-money">9.5M</div></div>
-        <div class="top-row"><div class="top-pos">🥈</div><div class="top-name">Кирилл</div><div class="top-money">5.2M</div></div>
-        <div class="top-row you"><div class="top-pos">🥉</div><div class="top-name">Вася (Ты)</div><div class="top-money">1.25M</div></div>
-        <div class="top-row"><div class="top-pos">4</div><div class="top-name">Петя</div><div class="top-money">500K</div></div>
+      <div class="top-row"><div class="top-pos">🥇</div><div class="top-name">Макс</div><div class="top-money">9.5M</div></div>
+      <div class="top-row"><div class="top-pos">🥈</div><div class="top-name">Кирилл</div><div class="top-money">5.2M</div></div>
+      <div class="top-row you"><div class="top-pos">🥉</div><div class="top-name">Вася (Ты)</div><div class="top-money">1.25M</div></div>
+      <div class="top-row"><div class="top-pos">4</div><div class="top-name">Петя</div><div class="top-money">500K</div></div>
     </div>
+  </div>
 </div>
 
-<!-- НИЖНЕЕ МЕНЮ -->
-<div class="nav-container">
-    <button class="nav-item active" onclick="openTab('home', this)"><span>🏠</span><div class="label">Главная</div></button>
-    <button class="nav-item" onclick="openTab('shop', this)"><span>🛒</span><div class="label">Магазин</div></button>
-    <button class="nav-item" onclick="openTab('casino', this)"><span>🎰</span><div class="label">Казино</div></button>
-    <button class="nav-item" onclick="openTab('work', this)"><span>💼</span><div class="label">Работа</div></button>
-    <button class="nav-item" onclick="openTab('rating', this)"><span>🏆</span><div class="label">Топ</div></button>
-</div>
+<!-- ТАБ-БАР -->
+<div class="tabbar"><div class="in">
+  <button class="tab on home" onclick="openTab('home', this)"><span class="ti">🏠</span>Главная</button>
+  <button class="tab" onclick="openTab('shop', this)"><span class="ti">🛒</span>Магазин</button>
+  <button class="tab" onclick="openTab('casino', this)"><span class="ti">🎰</span>Казино</button>
+  <button class="tab" onclick="openTab('work', this)"><span class="ti">💼</span>Работа</button>
+  <button class="tab" onclick="openTab('rating', this)"><span class="ti">🏆</span>Рейтинг</button>
+</div></div>
 
 <script>
-    // Навигация
-    function openTab(tabName, btn) {
-        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-        
-        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-        document.getElementById('screen-' + tabName).classList.add('active');
-        
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        btn.classList.add('active');
-    }
+  // Навигация
+  function openTab(tabName, btn) {
+      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+      
+      document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+      document.getElementById('screen-' + tabName).classList.add('active');
+      
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('on'));
+      btn.classList.add('on');
+      
+      // Скролл вверх при смене таба
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
-    // Модалка снизу
-    function openSheet(icon, title, text) {
-        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-        document.getElementById('bs-icon').innerText = icon;
-        document.getElementById('bs-title').innerText = title;
-        document.getElementById('bs-text').innerText = text;
-        document.getElementById('bottomSheet').classList.add('active');
-    }
-    function closeSheet(e) {
-        if (e && e.target.id !== 'bottomSheet') return;
-        document.getElementById('bottomSheet').classList.remove('active');
-        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-    }
+  // Модалка
+  function openSheet(icon, title, text) {
+      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      document.getElementById('bs-icon').innerText = icon;
+      document.getElementById('bs-title').innerText = title;
+      document.getElementById('bs-text').innerText = text;
+      document.getElementById('bottomSheet').classList.add('active');
+  }
+  function closeSheet(e) {
+      if (e && e.target.id !== 'bottomSheet') return;
+      document.getElementById('bottomSheet').classList.remove('active');
+  }
 
-    // Детали предмета
-    function openItemDetail(title, price, imgUrl, rarity, stat2) {
-        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+  // Детали предмета
+  function openItemDetail(title, price, imgUrl, rarity, stat2) {
+      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
 
-        document.getElementById('detail-title').innerText = title;
-        document.getElementById('detail-price').innerText = price;
-        document.getElementById('detail-rarity').innerText = rarity;
-        document.getElementById('detail-stat2').innerText = stat2;
-        
-        const imgElement = document.getElementById('detail-img');
-        imgElement.src = imgUrl;
-        imgElement.onerror = function() { this.src = 'https://placehold.co/600x600/ffffff/000000?text=' + encodeURIComponent(title); };
+      document.getElementById('detail-title').innerText = title;
+      document.getElementById('detail-price').innerText = price;
+      document.getElementById('detail-rarity').innerText = rarity;
+      document.getElementById('detail-stat2').innerText = stat2;
+      
+      const imgElement = document.getElementById('detail-img');
+      imgElement.src = imgUrl;
+      imgElement.onerror = function() { this.src = 'https://placehold.co/600x600/ffffff/000000?text=' + encodeURIComponent(title); };
 
-        document.querySelector('.nav-container').style.display = 'none';
-        document.getElementById('screen-item-detail').style.display = 'block';
-    }
+      document.getElementById('screen-item-detail').style.display = 'block';
+  }
 
-    function closeItemDetail() {
-        if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-        document.getElementById('screen-item-detail').style.display = 'none';
-        document.querySelector('.nav-container').style.display = 'flex';
-    }
+  function closeItemDetail() {
+      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+      document.getElementById('screen-item-detail').style.display = 'none';
+  }
 </script>
 </body>
-                </html>
+    </html>
