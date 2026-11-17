@@ -2,7 +2,7 @@ import os
 import random
 import asyncio
 import asyncpg
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -20,16 +20,24 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7127705775"))
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://your-app.pages.dev")
 
 pool = None
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# --- СОСТОЯНИЯ ---
 class Reg(StatesGroup):
     waiting_nickname = State()
 
-# --- БАЗА ДАННЫХ ---
+class AdminStates(StatesGroup):
+    waiting_id = State()
+    waiting_amount = State()
+    waiting_reason = State()
+    waiting_broadcast = State()
+
+# --- ИНИЦИАЛИЗАЦИЯ БАЗЫ ---
 async def init_db():
     global pool
     dsn = DATABASE_URL.replace("?sslmode=require", "?ssl=true")
@@ -46,14 +54,13 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS daily_rewards (
                 tg_id BIGINT PRIMARY KEY, last_claim DATE, streak INT DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS bans (
+                tg_id BIGINT PRIMARY KEY, reason TEXT, banned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
 
-async def get_user_db(tg_id):
-    async with pool.acquire() as conn:
-        return await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", tg_id)
-
 # ==========================================
-# ЧАСТЬ 1: ЛОГИКА БОТА (AIOGRAM)
+# ЧАСТЬ 1: TELEGRAM БОТ
 # ==========================================
 
 def main_menu_kb():
@@ -62,9 +69,35 @@ def main_menu_kb():
         [KeyboardButton(text="🎮 Открыть игру (Mini App)", web_app={"url": MINI_APP_URL})]
     ], resize_keyboard=True)
 
+# --- Мидлварь для проверки бана ---
+from aiogram import BaseMiddleware
+class BanMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        uid = None
+        if isinstance(event, Message): uid = event.from_user.id
+        elif isinstance(event, CallbackQuery): uid = event.from_user.id
+        
+        if uid and uid != ADMIN_ID:
+            async with pool.acquire() as conn:
+                ban = await conn.fetchrow("SELECT reason FROM bans WHERE tg_id = $1", uid)
+            if ban:
+                reason = ban['reason'] or "без причины"
+                if isinstance(event, Message):
+                    await event.answer(f"🚫 Ты забанен.\nПричина: {reason}")
+                else:
+                    await event.answer(f"🚫 Забанен: {reason}", show_alert=True)
+                return
+        return await handler(event, data)
+
+dp.message.outer_middleware(BanMiddleware())
+dp.callback_query.outer_middleware(BanMiddleware())
+
+# --- Старт ---
 @dp.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
-    user = await get_user_db(message.from_user.id)
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", message.from_user.id)
+    
     if user:
         await message.answer(f"С возвращением, {user['nickname']}! Твой баланс: {user['balance']} 💰", reply_markup=main_menu_kb())
     else:
@@ -87,17 +120,162 @@ async def process_nickname(message: Message, state: FSMContext):
 
 @dp.message(F.text == "👤 Профиль")
 async def bot_profile(message: Message):
-    user = await get_user_db(message.from_user.id)
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", message.from_user.id)
     if not user: return await message.answer("Напиши /start")
     await message.answer(f"👤 Ник: {user['nickname']}\n💰 Баланс: {user['balance']}\n📈 Уровень: {user['level']}")
 
-@dp.message(F.text == "💰 Баланс")
-async def bot_balance(message: Message):
-    user = await get_user_db(message.from_user.id)
-    if user: await message.answer(f"💰 Баланс: {user['balance']} монет")
+# ==========================================
+# ЧАСТЬ 2: АДМИН-ПАНЕЛЬ (ТОЛЬКО ДЛЯ ADMIN_ID)
+# ==========================================
+
+def admin_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Найти игрока", callback_data="adm_find")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="adm_stats")],
+        [InlineKeyboardButton(text="📢 Рассылка", callback_data="adm_broadcast")],
+        [InlineKeyboardButton(text="🧯 Очистить чат", callback_data="adm_clear")]
+    ])
+
+@dp.message(Command("admin"))
+async def admin_cmd(message: Message):
+    if message.from_user.id != ADMIN_ID: return
+    await message.answer("🛡 <b>АДМИН-ПАНЕЛЬ</b>\nВыбери действие:", parse_mode="HTML", reply_markup=admin_menu_kb())
+
+@dp.callback_query(F.data == "adm_stats")
+async def adm_stats(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID: return
+    async with pool.acquire() as conn:
+        users = await conn.fetchval("SELECT COUNT(*) FROM users")
+        total_money = await conn.fetchval("SELECT SUM(balance) FROM users")
+        bans = await conn.fetchval("SELECT COUNT(*) FROM bans")
+    
+    text = (f"📊 <b>Статистика</b>\n\n"
+            f"👥 Игроков: {users}\n"
+            f"💰 Всего денег: {total_money or 0:,}\n"
+            f"🚫 Забанено: {bans}")
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="adm_back")]]))
+    await callback.answer()
+
+# --- Поиск игрока (упрощенно) ---
+@dp.callback_query(F.data == "adm_find")
+async def adm_find(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    await state.set_state(AdminStates.waiting_id)
+    await callback.message.edit_text("Введи Telegram ID игрока или ник (например: 7127705775):")
+    await callback.answer()
+
+@dp.message(AdminStates.waiting_id)
+async def adm_find_process(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID: return
+    query = message.text.strip()
+    
+    async with pool.acquire() as conn:
+        if query.isdigit():
+            user = await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", int(query))
+        else:
+            user = await conn.fetchrow("SELECT * FROM users WHERE LOWER(nickname) = LOWER($1)", query)
+    
+    if not user:
+        await message.answer("❌ Игрок не найден")
+        await state.clear()
+        return
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 Изменить баланс", callback_data=f"adm_bal_{user['tg_id']}")],
+        [InlineKeyboardButton(text="🚫 Забанить/Разбанить", callback_data=f"adm_ban_{user['tg_id']}")],
+        [InlineKeyboardButton(text="🎯 Форс-вин (игра)", callback_data=f"adm_win_{user['tg_id']}")]
+    ])
+    
+    await message.answer(f"👤 <b>{user['nickname']}</b> (ID: {user['tg_id']})\n💰 Баланс: {user['balance']:,}", parse_mode="HTML", reply_markup=kb)
+    await state.clear()
+
+# --- Изменение баланса ---
+@dp.callback_query(F.data.startswith("adm_bal_"))
+async def adm_bal(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    uid = int(callback.data.split("_")[2])
+    await state.update_data(target_uid=uid)
+    await state.set_state(AdminStates.waiting_amount)
+    await callback.message.edit_text("Введи сумму (положительную для выдачи, отрицательную для списания):")
+    await callback.answer()
+
+@dp.message(AdminStates.waiting_amount)
+async def adm_bal_process(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID: return
+    try:
+        amount = int(message.text.strip())
+    except ValueError:
+        return await message.answer("Введи число!")
+    
+    data = await state.get_data()
+    uid = data['target_uid']
+    
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", amount, uid)
+    
+    await message.answer(f"✅ Баланс игрока {uid} изменен на {amount:,}", parse_mode="HTML", reply_markup=main_menu_kb())
+    await state.clear()
+
+# --- Бан ---
+@dp.callback_query(F.data.startswith("adm_ban_"))
+async def adm_ban(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID: return
+    uid = int(callback.data.split("_")[2])
+    
+    async with pool.acquire() as conn:
+        ban = await conn.fetchrow("SELECT reason FROM bans WHERE tg_id = $1", uid)
+        if ban:
+            await conn.execute("DELETE FROM bans WHERE tg_id = $1", uid)
+            await callback.message.edit_text(f"✅ Игрок {uid} разбанен.")
+        else:
+            await conn.execute("INSERT INTO bans (tg_id, reason) VALUES ($1, 'Нарушение правил')", uid)
+            await callback.message.edit_text(f"✅ Игрок {uid} забанен.")
+    await callback.answer()
+
+# --- Форс-вин (заглушка) ---
+@dp.callback_query(F.data.startswith("adm_win_"))
+async def adm_win(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID: return
+    await callback.answer("Форс-вин активирован на следующую игру (заглушка)", show_alert=True)
+
+# --- Рассылка ---
+@dp.callback_query(F.data == "adm_broadcast")
+async def adm_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    await state.set_state(AdminStates.waiting_broadcast)
+    await callback.message.edit_text("📢 Введи текст для рассылки всем игрокам:")
+    await callback.answer()
+
+@dp.message(AdminStates.waiting_broadcast)
+async def adm_broadcast_process(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID: return
+    text = message.text.strip()
+    
+    async with pool.acquire() as conn:
+        users = await conn.fetch("SELECT tg_id FROM users")
+    
+    sent = 0
+    for user in users:
+        try:
+            await bot.send_message(user['tg_id'], text)
+            sent += 1
+            await asyncio.sleep(0.05)
+        except:
+            pass
+    
+    await message.answer(f"✅ Рассылка завершена. Отправлено: {sent}/{len(users)}")
+    await state.clear()
+
+@dp.callback_query(F.data == "adm_back")
+async def adm_back(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID: return
+    await state.clear()
+    await callback.message.edit_text("🛡 <b>АДМИН-ПАНЕЛЬ</b>\nВыбери действие:", parse_mode="HTML", reply_markup=admin_menu_kb())
+    await callback.answer()
 
 # ==========================================
-# ЧАСТЬ 2: API ДЛЯ MINI APP (FASTAPI)
+# ЧАСТЬ 3: API ДЛЯ MINI APP
 # ==========================================
 
 @asynccontextmanager
@@ -113,9 +291,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 @app.get("/api/profile/{tg_id}")
 async def api_profile(tg_id: int):
-    user = await get_user_db(tg_id)
-    if not user: raise HTTPException(404, "Игрок не найден")
     async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT nickname, balance FROM users WHERE tg_id = $1", tg_id)
+        if not user: raise HTTPException(404, "Игрок не найден")
         rank = await conn.fetchval("SELECT COUNT(*) FROM users WHERE balance > $1", user['balance']) + 1
     return {"nickname": user['nickname'], "balance": user['balance'], "rank": rank}
 
@@ -139,15 +317,15 @@ async def api_daily(tg_id: int):
         """, tg_id, today, streak)
         
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", tg_id)
-        return {"status": "ok", "reward": reward, "new_balance": new_bal}
+        return {"reward": reward, "new_balance": new_bal}
 
-class UpgRequest(BaseModel):
+class UpgReq(BaseModel):
     tg_id: int
     bet: int
     mult: float
 
 @app.post("/api/casino/upgrader")
-async def api_upgrader(req: UpgRequest):
+async def api_upg(req: UpgReq):
     async with pool.acquire() as conn:
         bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
         if bal < req.bet: raise HTTPException(400, "Мало денег!")
@@ -162,4 +340,4 @@ async def api_upgrader(req: UpgRequest):
             await conn.execute("UPDATE users SET balance = balance - $1 WHERE tg_id = $2", req.bet, req.tg_id)
         
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
-        return {"result": "win" if win > 0 else "lose", "roll": roll, "new_balance": new_bal}
+        return {"result": "win" if win > 0 else "lose", "new_balance": new_bal}
