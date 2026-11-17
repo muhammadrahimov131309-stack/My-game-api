@@ -1,3 +1,4 @@
+
 import os
 import random
 import asyncio
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher, F, BaseMiddleware
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -70,7 +71,6 @@ def main_menu_kb():
     ], resize_keyboard=True)
 
 # --- Мидлварь для проверки бана ---
-from aiogram import BaseMiddleware
 class BanMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         uid = None
@@ -125,16 +125,21 @@ async def bot_profile(message: Message):
     if not user: return await message.answer("Напиши /start")
     await message.answer(f"👤 Ник: {user['nickname']}\n💰 Баланс: {user['balance']}\n📈 Уровень: {user['level']}")
 
+@dp.message(F.text == "💰 Баланс")
+async def bot_balance(message: Message):
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT balance FROM users WHERE tg_id = $1", message.from_user.id)
+    if user: await message.answer(f"💰 Баланс: {user['balance']} монет")
+
 # ==========================================
-# ЧАСТЬ 2: АДМИН-ПАНЕЛЬ (ТОЛЬКО ДЛЯ ADMIN_ID)
+# ЧАСТЬ 2: АДМИН-ПАНЕЛЬ
 # ==========================================
 
 def admin_menu_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👤 Найти игрока", callback_data="adm_find")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="adm_stats")],
-        [InlineKeyboardButton(text="📢 Рассылка", callback_data="adm_broadcast")],
-        [InlineKeyboardButton(text="🧯 Очистить чат", callback_data="adm_clear")]
+        [InlineKeyboardButton(text="📢 Рассылка", callback_data="adm_broadcast")]
     ])
 
 @dp.message(Command("admin"))
@@ -157,19 +162,17 @@ async def adm_stats(callback: CallbackQuery):
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Назад", callback_data="adm_back")]]))
     await callback.answer()
 
-# --- Поиск игрока (упрощенно) ---
 @dp.callback_query(F.data == "adm_find")
 async def adm_find(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID: return
     await state.set_state(AdminStates.waiting_id)
-    await callback.message.edit_text("Введи Telegram ID игрока или ник (например: 7127705775):")
+    await callback.message.edit_text("Введи Telegram ID игрока или ник:")
     await callback.answer()
 
 @dp.message(AdminStates.waiting_id)
 async def adm_find_process(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID: return
     query = message.text.strip()
-    
     async with pool.acquire() as conn:
         if query.isdigit():
             user = await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", int(query))
@@ -183,30 +186,25 @@ async def adm_find_process(message: Message, state: FSMContext):
     
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 Изменить баланс", callback_data=f"adm_bal_{user['tg_id']}")],
-        [InlineKeyboardButton(text="🚫 Забанить/Разбанить", callback_data=f"adm_ban_{user['tg_id']}")],
-        [InlineKeyboardButton(text="🎯 Форс-вин (игра)", callback_data=f"adm_win_{user['tg_id']}")]
+        [InlineKeyboardButton(text="🚫 Забанить/Разбанить", callback_data=f"adm_ban_{user['tg_id']}")]
     ])
-    
     await message.answer(f"👤 <b>{user['nickname']}</b> (ID: {user['tg_id']})\n💰 Баланс: {user['balance']:,}", parse_mode="HTML", reply_markup=kb)
     await state.clear()
 
-# --- Изменение баланса ---
 @dp.callback_query(F.data.startswith("adm_bal_"))
 async def adm_bal(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID: return
     uid = int(callback.data.split("_")[2])
     await state.update_data(target_uid=uid)
     await state.set_state(AdminStates.waiting_amount)
-    await callback.message.edit_text("Введи сумму (положительную для выдачи, отрицательную для списания):")
+    await callback.message.edit_text("Введи сумму (+ выдать, - списать):")
     await callback.answer()
 
 @dp.message(AdminStates.waiting_amount)
 async def adm_bal_process(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID: return
-    try:
-        amount = int(message.text.strip())
-    except ValueError:
-        return await message.answer("Введи число!")
+    try: amount = int(message.text.strip())
+    except ValueError: return await message.answer("Введи число!")
     
     data = await state.get_data()
     uid = data['target_uid']
@@ -217,12 +215,10 @@ async def adm_bal_process(message: Message, state: FSMContext):
     await message.answer(f"✅ Баланс игрока {uid} изменен на {amount:,}", parse_mode="HTML", reply_markup=main_menu_kb())
     await state.clear()
 
-# --- Бан ---
 @dp.callback_query(F.data.startswith("adm_ban_"))
 async def adm_ban(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID: return
     uid = int(callback.data.split("_")[2])
-    
     async with pool.acquire() as conn:
         ban = await conn.fetchrow("SELECT reason FROM bans WHERE tg_id = $1", uid)
         if ban:
@@ -233,37 +229,26 @@ async def adm_ban(callback: CallbackQuery):
             await callback.message.edit_text(f"✅ Игрок {uid} забанен.")
     await callback.answer()
 
-# --- Форс-вин (заглушка) ---
-@dp.callback_query(F.data.startswith("adm_win_"))
-async def adm_win(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID: return
-    await callback.answer("Форс-вин активирован на следующую игру (заглушка)", show_alert=True)
-
-# --- Рассылка ---
 @dp.callback_query(F.data == "adm_broadcast")
 async def adm_broadcast(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID: return
     await state.set_state(AdminStates.waiting_broadcast)
-    await callback.message.edit_text("📢 Введи текст для рассылки всем игрокам:")
+    await callback.message.edit_text("📢 Введи текст для рассылки:")
     await callback.answer()
 
 @dp.message(AdminStates.waiting_broadcast)
 async def adm_broadcast_process(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID: return
     text = message.text.strip()
-    
     async with pool.acquire() as conn:
         users = await conn.fetch("SELECT tg_id FROM users")
-    
     sent = 0
     for user in users:
         try:
             await bot.send_message(user['tg_id'], text)
             sent += 1
             await asyncio.sleep(0.05)
-        except:
-            pass
-    
+        except: pass
     await message.answer(f"✅ Рассылка завершена. Отправлено: {sent}/{len(users)}")
     await state.clear()
 
@@ -292,10 +277,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 @app.get("/api/profile/{tg_id}")
 async def api_profile(tg_id: int):
     async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT nickname, balance FROM users WHERE tg_id = $1", tg_id)
+        user = await conn.fetchrow("SELECT nickname, balance, level, xp FROM users WHERE tg_id = $1", tg_id)
         if not user: raise HTTPException(404, "Игрок не найден")
+        # Ранг
         rank = await conn.fetchval("SELECT COUNT(*) FROM users WHERE balance > $1", user['balance']) + 1
-    return {"nickname": user['nickname'], "balance": user['balance'], "rank": rank}
+    return {"nickname": user['nickname'], "balance": user['balance'], "level": user['level'], "rank": rank}
 
 @app.post("/api/daily/{tg_id}")
 async def api_daily(tg_id: int):
@@ -304,18 +290,15 @@ async def api_daily(tg_id: int):
         today = date.today()
         if row and row['last_claim'] == today:
             raise HTTPException(400, "Уже забрал сегодня!")
-        
         streak = 1
         if row and row['last_claim'] == today - timedelta(days=1):
             streak = row['streak'] + 1
-            
         reward = 5000 * streak
         await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", reward, tg_id)
         await conn.execute("""
             INSERT INTO daily_rewards (tg_id, last_claim, streak) VALUES ($1, $2, $3)
             ON CONFLICT (tg_id) DO UPDATE SET last_claim = $2, streak = $3
         """, tg_id, today, streak)
-        
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", tg_id)
         return {"reward": reward, "new_balance": new_bal}
 
@@ -329,7 +312,6 @@ async def api_upg(req: UpgReq):
     async with pool.acquire() as conn:
         bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
         if bal < req.bet: raise HTTPException(400, "Мало денег!")
-        
         chance = round(90 / req.mult)
         roll = random.randint(1, 100)
         win = 0
@@ -338,6 +320,5 @@ async def api_upg(req: UpgReq):
             await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", win, req.tg_id)
         else:
             await conn.execute("UPDATE users SET balance = balance - $1 WHERE tg_id = $2", req.bet, req.tg_id)
-        
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", req.tg_id)
         return {"result": "win" if win > 0 else "lose", "new_balance": new_bal}
