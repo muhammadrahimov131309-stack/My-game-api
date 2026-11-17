@@ -3,186 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>UNDERWORLD: RPG</title>
+    <title>UNDERWORLD: Маркет</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
 
         :root {
-            --bg: #08080B;
-            --surface: rgba(22, 22, 28, 0.7);
-            --surface-solid: #16161C;
-            --surface-light: #22222A;
-            --border: rgba(255, 255, 255, 0.08);
-            --accent: #00FFB2;
-            --purple: #9D4EDD;
-            --gold: #FFD60A;
-            --danger: #FF3366;
-            --text: #FFFFFF;
-            --text-muted: #8A8A93;
-            --nav-bg: rgba(15, 15, 20, 0.9);
+            --bg: #08080B; --surface: rgba(22, 22, 28, 0.7); --surface-solid: #16161C;
+            --surface-light: #22222A; --border: rgba(255, 255, 255, 0.08);
+            --accent: #00FFB2; --purple: #9D4EDD; --gold: #FFD60A;
+            --danger: #FF3366; --text: #FFFFFF; --text-muted: #8A8A93;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-        
-        body {
-            margin: 0; padding: 0; padding-bottom: 110px;
-            background-color: var(--bg); color: var(--text);
-            font-family: 'Inter', sans-serif; overflow-x: hidden;
-            background-image: radial-gradient(circle at 50% 0%, rgba(157, 78, 221, 0.1) 0%, transparent 50%);
-            background-attachment: fixed;
-        }
-
+        body { margin: 0; padding: 0; padding-bottom: 110px; background-color: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; overflow-x: hidden; background-image: radial-gradient(circle at 50% 0%, rgba(157, 78, 221, 0.1) 0%, transparent 50%); background-attachment: fixed; }
         h1, h2, h3, .font-display { font-family: 'Space Grotesk', sans-serif; }
 
-        /* --- ЭКРАНЫ --- */
         .screen { display: none; padding: 20px 0; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         .screen.active { display: block; }
         .padding-x { padding: 0 16px; }
-        
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        .header-title {
-            font-size: 28px; font-weight: 700; margin: 0 0 20px 0;
-            letter-spacing: -0.5px; display: flex; justify-content: space-between; align-items: center;
-        }
+        .header-title { font-size: 28px; font-weight: 700; margin: 0 0 20px 0; letter-spacing: -0.5px; display: flex; justify-content: space-between; align-items: center; }
         .header-title span { color: var(--accent); }
 
-        /* --- ГЛАВНАЯ (ОСТАЕТСЯ КРАСИВОЙ) --- */
-        .user-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding: 0 16px; }
-        .avatar-wrap { position: relative; width: 64px; height: 64px; }
-        .avatar { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(135deg, var(--purple), var(--accent)); padding: 2px; }
-        .avatar-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
-        .level-badge { position: absolute; bottom: -4px; right: -4px; background: var(--surface-solid); border: 2px solid var(--accent); color: var(--accent); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; }
-        .user-info { flex: 1; }
-        .user-info h2 { margin: 0; font-size: 20px; font-weight: 700; }
-        .xp-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 8px; overflow: hidden; }
-        .xp-fill { width: 65%; height: 100%; background: var(--accent); border-radius: 3px; box-shadow: 0 0 10px var(--accent); }
-
-        .balance-card { background: var(--surface); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 24px; padding: 24px; text-align: center; margin: 0 16px 24px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .balance-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; }
-        .balance-amount { font-size: 44px; font-weight: 700; margin: 8px 0 16px 0; font-family: 'Space Grotesk', sans-serif; }
-        .balance-amount span { color: var(--accent); font-size: 32px; }
-        
-        .btn { background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 14px; font-weight: 700; font-size: 14px; width: 100%; cursor: pointer; transition: 0.2s; }
-        .btn:active { transform: scale(0.97); background: rgba(255,255,255,0.15); }
-        .btn-primary { background: var(--accent); color: #000; border: none; box-shadow: 0 4px 15px rgba(0,255,178,0.3); }
-
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
-        .menu-tile { background: var(--surface); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s; }
-        .menu-tile:active { transform: scale(0.95); background: var(--surface-hover); }
-        .menu-tile .icon { font-size: 28px; }
-        .menu-tile span { font-size: 13px; font-weight: 700; }
-
-        /* --- НОВЫЙ МАГАЗИН (КАК НА СКРИНШОТАХ) --- */
+        /* --- МАГАЗИН (КАРУСЕЛИ) --- */
         .shop-section { margin-bottom: 25px; }
         .shop-section-header { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; margin-bottom: 12px; }
-        .shop-section-title { font-size: 20px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
-        .shop-section-link { color: #4da6ff; font-size: 14px; font-weight: 500; cursor: pointer; }
-
-        .shop-carousel {
-            display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 10px 16px;
-            scroll-snap-type: x mandatory; scrollbar-width: none;
-        }
+        .shop-section-title { font-size: 20px; font-weight: 700; margin: 0; }
+        .shop-section-link { color: #4da6ff; font-size: 14px; }
+        
+        .shop-carousel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 10px 16px; scrollbar-width: none; }
         .shop-carousel::-webkit-scrollbar { display: none; }
-
-        .shop-item {
-            flex: 0 0 260px; scroll-snap-align: start; cursor: pointer;
-            display: flex; flex-direction: column;
-        }
-        .shop-item-img {
-            width: 100%; height: 220px; background: #fff; border-radius: 16px;
-            display: flex; align-items: center; justify-content: center; font-size: 80px;
+        
+        .shop-item { flex: 0 0 260px; cursor: pointer; display: flex; flex-direction: column; }
+        
+        /* БЕЛЫЙ ФОН ДЛЯ КАРТИНОК КАК В CS:GO */
+        .shop-item-img { 
+            width: 100%; height: 220px; background: #ffffff; border-radius: 16px; 
+            display: flex; align-items: center; justify-content: center; 
             margin-bottom: 10px; position: relative; overflow: hidden;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        /* Плейсхолдер для будущей картинки */
-        .shop-item-img img { width: 100%; height: 100%; object-fit: contain; }
+        .shop-item-img img { width: 100%; height: 100%; object-fit: contain; padding: 10px; }
         
-        .shop-item-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+        .shop-item-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .shop-item-price { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-        .shop-item-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 2px; }
+        .shop-item-sub { font-size: 13px; color: var(--text-muted); }
 
         /* --- ДЕТАЛЬНЫЙ ЭКРАН ПРЕДМЕТА --- */
-        #screen-item-detail { background: var(--bg); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; overflow-y: auto; padding-bottom: 30px; }
+        #screen-item-detail { background: var(--bg); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; overflow-y: auto; padding-bottom: 30px; display: none; }
         .back-btn { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.5); border: none; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; z-index: 10; cursor: pointer; backdrop-filter: blur(10px); }
         
-        .detail-img-container {
-            width: 100%; height: 350px; background: #fff;
-            display: flex; align-items: center; justify-content: center; font-size: 120px;
-        }
+        .detail-img-container { width: 100%; height: 380px; background: #fff; display: flex; align-items: center; justify-content: center; }
+        .detail-img-container img { width: 100%; height: 100%; object-fit: contain; padding: 20px; }
         
         .detail-content { padding: 20px 16px; }
         .detail-title { font-size: 24px; font-weight: 700; margin: 0 0 15px 0; }
         
-        .try-on-btn {
-            width: 100%; background: rgba(255,255,255,0.1); border: none; color: #fff;
-            padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 600;
-            display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
-            margin-bottom: 20px;
-        }
-
+        .try-on-btn { width: 100%; background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 15px; border-radius: 12px; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        
+        .big-price { font-size: 32px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; margin-bottom: 5px; }
         .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
-        .detail-row:last-child { border: none; }
         .detail-label { color: var(--text-muted); }
         .detail-value { font-weight: 600; text-align: right; }
         
-        .big-price { font-size: 32px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; margin-bottom: 5px; }
-
         .stats-block { background: var(--surface-solid); border-radius: 16px; padding: 15px; margin: 20px 0; }
         .stats-title { font-size: 16px; font-weight: 700; margin: 0 0 10px 0; }
         .stat-line { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 14px; color: #ddd; }
-        .stat-line:last-child { margin: 0; }
+        
+        .btn { background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 14px; font-weight: 700; font-size: 14px; width: 100%; cursor: pointer; }
+        .btn-primary { background: var(--accent); color: #000; border: none; }
 
-        .orderbook { background: var(--surface-solid); border-radius: 16px; overflow: hidden; margin-top: 20px; }
-        .orderbook-tabs { display: flex; border-bottom: 1px solid var(--border); }
-        .ob-tab { flex: 1; text-align: center; padding: 12px; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
-        .ob-tab.active { color: #fff; border-bottom: 2px solid #fff; }
-        .ob-row { display: flex; justify-content: space-between; padding: 12px 15px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .ob-row:last-child { border: none; }
-        .ob-price { color: #4da6ff; font-weight: 600; }
-        .ob-qty { color: var(--text-muted); }
-
-        /* --- ОСТАЛЬНЫЕ ЭКРАНЫ --- */
-        .tabs { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 10px 16px; margin-bottom: 16px; scrollbar-width: none; }
-        .tabs::-webkit-scrollbar { display: none; }
-        .tab { padding: 10px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; font-size: 13px; font-weight: 700; white-space: nowrap; color: var(--text-muted); }
-        .tab.active { background: var(--text); color: #000; border-color: var(--text); }
-
-        .work-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 18px; margin: 0 16px 12px 16px; display: flex; align-items: center; gap: 16px; }
-        .work-card .w-icon { font-size: 32px; }
-        .work-card .w-info { flex: 1; }
-        .work-card .w-info h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; }
-        .work-card .w-info p { margin: 0; font-size: 12px; color: var(--text-muted); }
-
-        .top-list { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin: 0 16px; }
-        .top-row { display: flex; align-items: center; padding: 16px; border-bottom: 1px solid var(--border); }
-        .top-row:last-child { border-bottom: none; }
-        .top-row.you { background: rgba(0, 255, 178, 0.05); border-left: 3px solid var(--accent); }
-        .top-pos { width: 30px; font-weight: 700; color: var(--text-muted); }
-        .top-name { flex: 1; font-weight: 600; font-size: 15px; }
-        .top-money { font-weight: 700; color: var(--accent); font-size: 15px; }
-
-        .game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
-        .game-card { border-radius: 20px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; height: 140px; cursor: pointer; border: 1px solid var(--border); }
-        .gc-upg { background: linear-gradient(135deg, #1e1e2f, #2a0a3a); }
-        .gc-roul { background: linear-gradient(135deg, #1e1e2f, #0a2a3a); }
-        .gc-pvp { background: linear-gradient(135deg, #1e1e2f, #3a0a0a); }
-        .gc-mines { background: linear-gradient(135deg, #1e1e2f, #1a3a0a); }
-        .game-card .icon { font-size: 36px; }
-        .game-card .title { font-size: 16px; font-weight: 700; }
-        .game-card .sub { font-size: 11px; color: var(--text-muted); }
-
-        /* --- ПЛАВАЮЩЕЕ МЕНЮ --- */
-        .nav-container {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: calc(100% - 32px); max-width: 400px;
-            background: var(--nav-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
-            border: 1px solid rgba(255,255,255,0.1); border-radius: 30px;
-            display: flex; justify-content: space-around; padding: 12px 10px;
-            z-index: 100; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        }
-        .nav-item { background: none; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: 0.3s; position: relative; padding: 5px 10px; }
+        /* --- НИЖНЕЕ МЕНЮ --- */
+        .nav-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 32px); max-width: 400px; background: rgba(15, 15, 20, 0.9); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); border-radius: 30px; display: flex; justify-content: space-around; padding: 12px 10px; z-index: 100; }
+        .nav-item { background: none; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; position: relative; padding: 5px 10px; }
         .nav-item span { font-size: 22px; transition: 0.3s; }
         .nav-item .label { font-size: 10px; font-weight: 700; opacity: 0; transform: translateY(5px); transition: 0.3s; position: absolute; bottom: -15px; }
         .nav-item.active { color: var(--accent); }
@@ -192,226 +87,268 @@
 </head>
 <body>
 
-<!-- 1. ГЛАВНАЯ -->
-<div id="screen-home" class="screen active">
-    <div class="user-header">
-        <div class="avatar-wrap">
-            <div class="avatar"><div class="avatar-inner">V</div></div>
-            <div class="level-badge">LVL 12</div>
-        </div>
-        <div class="user-info">
-            <h2>Вася</h2>
-            <div class="xp-bg"><div class="xp-fill"></div></div>
-        </div>
-    </div>
-
-    <div class="balance-card">
-        <div class="balance-title">Твой капитал</div>
-        <div class="balance-amount">1.25M <span>💰</span></div>
-        <button class="btn btn-primary">Пополнить баланс</button>
-    </div>
-
-    <div class="grid-2">
-        <div class="menu-tile"><div class="icon">🎁</div><span>Награды</span></div>
-        <div class="menu-tile"><div class="icon">🎰</div><span>Слот дня</span></div>
-        <div class="menu-tile"><div class="icon">🏴</div><span>Банда</span></div>
-        <div class="menu-tile"><div class="icon">🎒</div><span>Инвентарь</span></div>
-    </div>
-</div>
-
-<!-- 2. МАГАЗИН (В СТИЛЕ БОТ-БАНДИТ) -->
-<div id="screen-shop" class="screen">
-    <div class="padding-x"><div class="header-title">Магазин<span>.</span></div></div>
-    
-    <!-- Блок 1: Встречайте -->
-    <div class="shop-section">
-        <div class="shop-section-header">
-            <h2 class="shop-section-title">Встречайте: Durov's Cap 🔥</h2>
-            <div class="shop-section-link">Показать все</div>
-        </div>
-        <div class="shop-carousel">
-            <!-- Карточка 1 -->
-            <div class="shop-item" onclick="openItemDetail('Durov\\'s Cap: Redrum', '$69,000,000,000', '🧢')">
-                <div class="shop-item-img">🧢</div>
-                <div class="shop-item-title">Durov's Cap: Redrum</div>
-                <div class="shop-item-price">$69 000 000 000</div>
-                <div class="shop-item-sub">Защита — 800</div>
-            </div>
-            <!-- Карточка 2 -->
-            <div class="shop-item" onclick="openItemDetail('Durov\\'s Cap: Blue', '$120,000,000,000', '🧢')">
-                <div class="shop-item-img" style="background: #e6f2ff;">🧢</div>
-                <div class="shop-item-title">Durov's Cap: Blue</div>
-                <div class="shop-item-price">$120 000 000 000</div>
-                <div class="shop-item-sub">Защита — 850</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Блок 2: Новинки -->
-    <div class="shop-section">
-        <div class="shop-section-header">
-            <h2 class="shop-section-title">Новинки</h2>
-            <div class="shop-section-link">Показать все</div>
-        </div>
-        <div class="shop-carousel">
-            <!-- Карточка 3 -->
-            <div class="shop-item" onclick="openItemDetail('Sperme® x MM6 Hoodie', '$200,000,000,000', '🧥')">
-                <div class="shop-item-img">🧥</div>
-                <div class="shop-item-title">Sperme® x MM6 Hoodie</div>
-                <div class="shop-item-price">$200 000 000 000</div>
-                <div class="shop-item-sub">Защита — 800</div>
-            </div>
-            <!-- Карточка 4 -->
-            <div class="shop-item" onclick="openItemDetail('Джинсы + футболка', '10 000 💰', '👕')">
-                <div class="shop-item-img" style="background: #f0f0f0;">👕</div>
-                <div class="shop-item-title">Джинсы + футболка</div>
-                <div class="shop-item-price">10 000 💰</div>
-                <div class="shop-item-sub">Защита — 10</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 3. ДЕТАЛЬНЫЙ ЭКРАН ПРЕДМЕТА (ОТКРЫВАЕТСЯ ПРИ КЛИКЕ) -->
-<div id="screen-item-detail" class="screen">
+<!-- ЭКРАН ДЕТАЛЬНОГО ПРОСМОТРА -->
+<div id="screen-item-detail">
     <button class="back-btn" onclick="closeItemDetail()">←</button>
-    
-    <div class="detail-img-container" id="detail-img">🧢</div>
-    
+    <div class="detail-img-container">
+        <img id="detail-img" src="" alt="Item">
+    </div>
     <div class="detail-content">
-        <h1 class="detail-title" id="detail-title">Название предмета</h1>
+        <h1 class="detail-title" id="detail-title">Название</h1>
         
         <button class="try-on-btn">
             <span>👕</span> Примерить
         </button>
 
         <div class="detail-row">
-            <div class="detail-label">Последняя продажа</div>
+            <div class="detail-label">Цена</div>
             <div class="detail-value">
-                <div class="big-price" id="detail-price">$0</div>
+                <div class="big-price" id="detail-price">0</div>
             </div>
         </div>
         <div class="detail-row">
-            <div class="detail-label">Дата выхода</div>
-            <div class="detail-value">31 декабря 2025</div>
-        </div>
-        <div class="detail-row">
-            <div class="detail-label">Всего в игре</div>
-            <div class="detail-value">1 экземпляр</div>
+            <div class="detail-label">Редкость</div>
+            <div class="detail-value" id="detail-rarity">Обычный</div>
         </div>
 
         <div class="stats-block">
             <h3 class="stats-title">Характеристики</h3>
-            <div class="stat-line"><span>🛡️</span> защита — 800</div>
-            <div class="stat-line"><span>😍</span> анимированная вещь</div>
-        </div>
-
-        <div class="orderbook">
-            <h3 class="stats-title" style="padding: 15px 15px 0 15px;">Биржевой стакан</h3>
-            <div class="orderbook-tabs">
-                <div class="ob-tab active">Все</div>
-                <div class="ob-tab">Покупка</div>
-                <div class="ob-tab">Продажа</div>
-            </div>
-            <div class="ob-row">
-                <div class="ob-price">$3 000 000 000 000</div>
-                <div class="ob-qty">1 шт.</div>
-            </div>
-            <div class="ob-row">
-                <div class="ob-price">$2 900 000 000 000</div>
-                <div class="ob-qty">2 шт.</div>
-            </div>
-            <div class="ob-row">
-                <div class="ob-price">$2 500 000 000 000</div>
-                <div class="ob-qty">5 шт.</div>
-            </div>
+            <div class="stat-line"><span>🛡️</span> Защита — <span id="detail-stat1">800</span></div>
+            <div class="stat-line"><span>⚡</span> Бонус — <span id="detail-stat2">100</span></div>
         </div>
         
         <button class="btn btn-primary" style="margin-top: 20px;" onclick="alert('Покупка в разработке')">Купить сейчас</button>
     </div>
 </div>
 
-<!-- 4. КАЗИНО -->
-<div id="screen-casino" class="screen">
-    <div class="padding-x"><div class="header-title">Казино<span>.</span></div></div>
-    <div class="game-grid">
-        <div class="game-card gc-upg"><div class="icon">📈</div><div><div class="title">Апгрейдер</div><div class="sub">до x10</div></div></div>
-        <div class="game-card gc-roul"><div class="icon">🎡</div><div><div class="title">Рулетка</div><div class="sub">шанс x50</div></div></div>
-        <div class="game-card gc-pvp"><div class="icon">🎯</div><div><div class="title">PVP</div><div class="sub">1 vs 1</div></div></div>
-        <div class="game-card gc-mines"><div class="icon">💣</div><div><div class="title">Мины</div><div class="sub">x200 макс</div></div></div>
+<!-- ГЛАВНАЯ (Заглушка) -->
+<div id="screen-home" class="screen active">
+    <div class="padding-x"><div class="header-title">Главная<span>.</span></div></div>
+</div>
+
+<!-- МАГАЗИН -->
+<div id="screen-shop" class="screen" style="display: block;"> <!-- Сразу открыт для теста -->
+    <div class="padding-x"><div class="header-title">Магазин<span>.</span></div></div>
+    
+    <!-- БЛОК 1: ТАЧКИ -->
+    <div class="shop-section">
+        <div class="shop-section-header">
+            <h2 class="shop-section-title">Элитный автопарк 🏎️</h2>
+            <div class="shop-section-link">Показать все</div>
+        </div>
+        <div class="shop-carousel">
+            
+            <!-- 1: Мерседес с собакой -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Красная Звезда', 
+                '15 000 000 💰', 
+                '1.jpg', 
+                'Легендарный', 
+                'Скорость 350')">
+                <div class="shop-item-img">
+                    <img src="1.jpg" alt="Красная Звезда" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+1+(Красная+Звезда)'">
+                </div>
+                <div class="shop-item-title">Красная Звезда</div>
+                <div class="shop-item-price">15 000 000 💰</div>
+                <div class="shop-item-sub">Скорость — 350</div>
+            </div>
+
+            <!-- 2: Феррари с собакой -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Неизвестный зверь', 
+                '25 000 000 💰', 
+                '2.jpg', 
+                'Эпический', 
+                'Скорость 380')">
+                <div class="shop-item-img">
+                    <img src="2.jpg" alt="Неизвестный зверь" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+2+(Хз)'">
+                </div>
+                <div class="shop-item-title">Неизвестный зверь</div>
+                <div class="shop-item-price">25 000 000 💰</div>
+                <div class="shop-item-sub">Скорость — 380</div>
+            </div>
+
+            <!-- 3: Ford GT -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Черная Молния', 
+                '50 000 000 💰', 
+                '3.jpg', 
+                'Мифический', 
+                'Скорость 420')">
+                <div class="shop-item-img">
+                    <img src="3.jpg" alt="Черная Молния" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+3+(Черная+Молния)'">
+                </div>
+                <div class="shop-item-title">Черная Молния</div>
+                <div class="shop-item-price">50 000 000 💰</div>
+                <div class="shop-item-sub">Скорость — 420</div>
+            </div>
+
+            <!-- 4: Огурец -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Бугатти', 
+                '1 000 000 💰', 
+                '4.jpg', 
+                'Редкий', 
+                'Мемность 1000')">
+                <div class="shop-item-img">
+                    <img src="4.jpg" alt="Бугатти" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+4+(Бугатти)'">
+                </div>
+                <div class="shop-item-title">Бугатти</div>
+                <div class="shop-item-price">1 000 000 💰</div>
+                <div class="shop-item-sub">Мемность — 1000</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- БЛОК 2: АКСЕССУАРЫ, ПИТОМЦЫ И СКИНЫ -->
+    <div class="shop-section">
+        <div class="shop-section-header">
+            <h2 class="shop-section-title">Коллекция 🔥</h2>
+            <div class="shop-section-link">Показать все</div>
+        </div>
+        <div class="shop-carousel">
+
+            <!-- 5: Золотая маска -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Маска Декстера Моргана', 
+                '5 000 000 💰', 
+                '5.jpg', 
+                'Легендарный', 
+                'Защита 800')">
+                <div class="shop-item-img">
+                    <img src="5.jpg" alt="Маска" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+5+(Маска)'">
+                </div>
+                <div class="shop-item-title">Маска Декстера Моргана</div>
+                <div class="shop-item-price">5 000 000 💰</div>
+                <div class="shop-item-sub">Защита — 800</div>
+            </div>
+
+            <!-- 6: Щенок с биткоином -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Стендоффер 5', 
+                '10 000 000 💰', 
+                '6.jpg', 
+                'Эпический', 
+                'Удача +50')">
+                <div class="shop-item-img">
+                    <img src="6.jpg" alt="Стендоффер 5" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+6+(Стендоффер)'">
+                </div>
+                <div class="shop-item-title">Стендоффер 5</div>
+                <div class="shop-item-price">10 000 000 💰</div>
+                <div class="shop-item-sub">Удача — +50</div>
+            </div>
+
+            <!-- 7: Аниме-парень -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Анимешница', 
+                '500 000 💰', 
+                '7.jpg', 
+                'Редкий', 
+                'Стиль +100')">
+                <div class="shop-item-img">
+                    <img src="7.jpg" alt="Анимешница" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+7+(Анимешница)'">
+                </div>
+                <div class="shop-item-title">Анимешница</div>
+                <div class="shop-item-price">500 000 💰</div>
+                <div class="shop-item-sub">Стиль — +100</div>
+            </div>
+
+            <!-- 8: Второй щенок -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Растишка', 
+                '1 500 000 💰', 
+                '8.jpg', 
+                'Обычный', 
+                'Милота +999')">
+                <div class="shop-item-img">
+                    <img src="8.jpg" alt="Растишка" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+8+(Растишка)'">
+                </div>
+                <div class="shop-item-title">Растишка</div>
+                <div class="shop-item-price">1 500 000 💰</div>
+                <div class="shop-item-sub">Милота — +999</div>
+            </div>
+
+            <!-- 9: Дуров -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Павел Валерьевич', 
+                '100 000 000 💰', 
+                '9.jpg', 
+                'Мифический', 
+                'Влияние 1000')">
+                <div class="shop-item-img">
+                    <img src="9.jpg" alt="Павел Валерьевич" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+9+(Павел+Валерьевич)'">
+                </div>
+                <div class="shop-item-title">Павел Валерьевич</div>
+                <div class="shop-item-price">100 000 000 💰</div>
+                <div class="shop-item-sub">Влияние — 1000</div>
+            </div>
+
+            <!-- 10: Скамграм -->
+            <div class="shop-item" onclick="openItemDetail(
+                'Скамграм', 
+                '5 000 000 💰', 
+                '10.jpg', 
+                'Эпический', 
+                'Хитрость +100')">
+                <div class="shop-item-img">
+                    <img src="10.jpg" alt="Скамграм" onerror="this.src='https://placehold.co/600x400/ffffff/000000?text=Фото+10+(Скамграм)'">
+                </div>
+                <div class="shop-item-title">Скамграм</div>
+                <div class="shop-item-price">5 000 000 💰</div>
+                <div class="shop-item-sub">Хитрость — +100</div>
+            </div>
+
+        </div>
     </div>
 </div>
 
-<!-- 5. РАБОТА -->
-<div id="screen-work" class="screen">
-    <div class="padding-x"><div class="header-title">Работа<span>.</span></div></div>
-    <div class="work-card">
-        <div class="w-icon">🌾</div>
-        <div class="w-info"><h4>Ферма кротов</h4><p>Доход: до 50 000 💰 за сессию</p></div>
-        <button class="btn btn-primary" style="width: auto; padding: 10px 16px;">Играть</button>
-    </div>
-    <div class="work-card">
-        <div class="w-icon">🏢</div>
-        <div class="w-info"><h4>Мои бизнесы</h4><p>Накоплено: 15 400 💰</p></div>
-        <button class="btn" style="width: auto; padding: 10px 16px;">Забрать</button>
-    </div>
-</div>
-
-<!-- 6. РЕЙТИНГ -->
-<div id="screen-rating" class="screen">
-    <div class="padding-x"><div class="header-title">Рейтинг<span>.</span></div></div>
-    <div class="top-list">
-        <div class="top-row"><div class="top-pos">🥇</div><div class="top-name">Макс</div><div class="top-money">9.5M</div></div>
-        <div class="top-row"><div class="top-pos">🥈</div><div class="top-name">Кирилл</div><div class="top-money">5.2M</div></div>
-        <div class="top-row you"><div class="top-pos">🥉</div><div class="top-name">Вася (Ты)</div><div class="top-money">1.25M</div></div>
-    </div>
-</div>
+<!-- КАЗИНО, РАБОТА, РЕЙТИНГ (Заглушки) -->
+<div id="screen-casino" class="screen"><div class="padding-x"><div class="header-title">Казино<span>.</span></div></div></div>
+<div id="screen-work" class="screen"><div class="padding-x"><div class="header-title">Работа<span>.</span></div></div></div>
+<div id="screen-rating" class="screen"><div class="padding-x"><div class="header-title">Топ<span>.</span></div></div></div>
 
 <!-- НИЖНЕЕ МЕНЮ -->
 <div class="nav-container">
-    <button class="nav-item active" onclick="openTab('home', this)"><span>🏠</span><div class="label">Главная</div></button>
-    <button class="nav-item" onclick="openTab('shop', this)"><span>🛒</span><div class="label">Магазин</div></button>
+    <button class="nav-item" onclick="openTab('home', this)"><span>🏠</span><div class="label">Главная</div></button>
+    <button class="nav-item active" onclick="openTab('shop', this)"><span>🛒</span><div class="label">Магазин</div></button>
     <button class="nav-item" onclick="openTab('casino', this)"><span>🎰</span><div class="label">Казино</div></button>
     <button class="nav-item" onclick="openTab('work', this)"><span>💼</span><div class="label">Работа</div></button>
     <button class="nav-item" onclick="openTab('rating', this)"><span>🏆</span><div class="label">Топ</div></button>
 </div>
 
 <script>
-    // Навигация
     function openTab(tabName, btn) {
         if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-        
         document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
         document.getElementById('screen-' + tabName).classList.add('active');
-        
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         btn.classList.add('active');
     }
 
-    // Открытие карточки предмета
-    function openItemDetail(title, price, emoji) {
+    // Открытие деталей предмета
+    function openItemDetail(title, price, imgUrl, rarity, stat2) {
         if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
 
         document.getElementById('detail-title').innerText = title;
         document.getElementById('detail-price').innerText = price;
-        document.getElementById('detail-img').innerText = emoji;
+        document.getElementById('detail-rarity').innerText = rarity;
+        document.getElementById('detail-stat2').innerText = stat2;
         
-        // Скрываем нижнее меню при просмотре предмета
+        const imgElement = document.getElementById('detail-img');
+        imgElement.src = imgUrl;
+        // Если картинки 1.jpg нет, покажет заглушку
+        imgElement.onerror = function() { this.src = 'https://placehold.co/600x600/ffffff/000000?text=' + encodeURIComponent(title); };
+
         document.querySelector('.nav-container').style.display = 'none';
-        
-        // Показываем экран деталей поверх всего
         document.getElementById('screen-item-detail').style.display = 'block';
     }
 
-    // Закрытие карточки
     function closeItemDetail() {
         if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-        
         document.getElementById('screen-item-detail').style.display = 'none';
-        
-        // Возвращаем нижнее меню
         document.querySelector('.nav-container').style.display = 'flex';
     }
 </script>
 </body>
-</html>
+                    </html>
