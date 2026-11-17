@@ -14,7 +14,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
 # ==========================================
-# ⚙️ ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ (Твои настройки)
+# ⚙️ ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
 # ==========================================
 DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -25,14 +25,18 @@ RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "https://my-game-api-jm79.onrender
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Проверка токена
-if not BOT_TOKEN:
-    logger.warning("⚠️ Внимание: BOT_TOKEN не задан! Бот не сможет запуститься, пока вы не укажете его в настройках Render.")
-
 # ==========================================
-# 🗄 БАЗА ДАННЫХ (Временная в памяти для быстрого старта)
+# 🗄 БАЗА ДАННЫХ И ДЕФОЛТНЫЕ ДАННЫЕ (В памяти)
 # ==========================================
 users_db = {}
+
+# Магазин по умолчанию (товары)
+SHOP_ITEMS = [
+    {"id": 1, "name": "Кепка новичка", "type": "accessory", "rarity": "common", "price": 1000},
+    {"id": 2, "name": "Белая футболка", "type": "skin", "rarity": "common", "price": 2500},
+    {"id": 3, "name": "Тренч SHADOW", "type": "skin", "rarity": "epic", "price": 50000},
+    {"id": 4, "name": "Спортивная тачка", "type": "car", "rarity": "legendary", "price": 500000},
+]
 
 def get_or_create_user(tg_id: int, username: str = "Боец"):
     if tg_id not in users_db:
@@ -40,21 +44,18 @@ def get_or_create_user(tg_id: int, username: str = "Боец"):
             "id": len(users_db) + 1,
             "tg_id": tg_id,
             "nickname": username,
-            "balance": 10000,          # Стартовый бонус по ТЗ
+            "balance": 10000,          # Стартовый капитал
             "level": 1,
             "xp": 450,
             "max_xp": 1000,
-            "gang": "SHADOW",          # Как на твоем скриншоте
+            "gang": "SHADOW",
             "rank": len(users_db) + 1,
-            "daily_day": 3,
             "daily_claimed": False,
-            "slot_spins": 1,
-            "inventory": [
-                {"id": 1, "name": "Кепка новичка", "type": "accessory", "rarity": "common", "price": 1000},
-                {"id": 2, "name": "Белая футболка", "type": "skin", "rarity": "common", "price": 2500},
-                {"id": 3, "name": "Тренч SHADOW", "type": "skin", "rarity": "epic", "price": 50000},
+            "inventory": [SHOP_ITEMS[0], SHOP_ITEMS[1]],
+            "businesses": [
+                {"biz_id": 1, "name": "Палатка с хот-догами", "level": 1, "income_per_hour": 500, "accumulated": 1200}
             ],
-            "force_win": None,         # 'win' / 'lose' / None (подкрутка из админки)
+            "force_win": None,
             "is_banned": False
         }
     return users_db[tg_id]
@@ -70,37 +71,24 @@ if bot:
     async def cmd_start(message: types.Message):
         user = get_or_create_user(message.from_user.id, message.from_user.first_name)
         if user["is_banned"]:
-            return await message.answer("🚫 Ваш аккаунт заблокирован администрацией.")
+            return await message.answer("🚫 Ваш аккаунт заблокирован.")
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🎮 Открыть TSTCOIN", web_app=WebAppInfo(url=MINI_APP_URL))]
         ])
         await message.answer(
             f"👋 Привет, <b>{user['nickname']}</b>!\n\n"
-            f"Добро пожаловать в <b>TSTCOIN</b>.\n"
-            f"💰 Твой баланс: <b>{user['balance']:,}</b> монет\n"
-            f"🏴 Банда: <b>{user['gang']}</b>\n\n"
-            f"Жми кнопку ниже, чтобы войти в игру 👇",
+            f"💰 Баланс: <b>{user['balance']:,}</b> монет\n"
+            f"🏴 Банда: <b>{user['gang']}</b>",
             reply_markup=kb,
             parse_mode="HTML"
         )
 
-    # --- 🛡 АДМИН-ПАНЕЛЬ В ТЕЛЕГРАМЕ ---
     @dp.message(Command("admin"))
     async def cmd_admin(message: types.Message):
         if message.from_user.id != ADMIN_ID:
             return
-        
-        text = (
-            "🛡 <b>АДМИН-ПАНЕЛЬ TSTCOIN</b>\n\n"
-            "Команды управления:\n"
-            "• <code>/give [tg_id] [сумма]</code> — выдать монеты\n"
-            "• <code>/setwin [tg_id] win</code> — подкрутить победу\n"
-            "• <code>/setwin [tg_id] lose</code> — подкрутить слив\n"
-            "• <code>/ban [tg_id]</code> — заблокировать игрока\n"
-            f"\nАктивных игроков в базе: <b>{len(users_db)}</b>"
-        )
-        await message.answer(text, parse_mode="HTML")
+        await message.answer("🛡 Админ-панель активна. Используйте /give и /setwin.")
 
     @dp.message(Command("give"))
     async def admin_give(message: types.Message):
@@ -108,12 +96,11 @@ if bot:
             return
         try:
             _, target_id, amount = message.text.split()
-            target_id, amount = int(target_id), int(amount)
-            user = get_or_create_user(target_id)
-            user["balance"] += amount
-            await message.answer(f"✅ Игроку <code>{target_id}</code> начислено <b>{amount:,}</b> монет.", parse_mode="HTML")
+            user = get_or_create_user(int(target_id))
+            user["balance"] += int(amount)
+            await message.answer(f"✅ Начислено {amount} игроку {target_id}.")
         except Exception:
-            await message.answer("❌ Ошибка. Пример: <code>/give 7127705775 50000</code>", parse_mode="HTML")
+            await message.answer("❌ Формат: `/give tg_id сумма`")
 
     @dp.message(Command("setwin"))
     async def admin_setwin(message: types.Message):
@@ -121,38 +108,28 @@ if bot:
             return
         try:
             _, target_id, mode = message.text.split()
-            target_id = int(target_id)
-            user = get_or_create_user(target_id)
+            user = get_or_create_user(int(target_id))
             user["force_win"] = mode if mode in ["win", "lose"] else None
-            await message.answer(f"🎲 Подкрутка для <code>{target_id}</code>: <b>{user['force_win']}</b>", parse_mode="HTML")
+            await message.answer(f"🎲 Подкрутка для {target_id}: {user['force_win']}")
         except Exception:
-            await message.answer("❌ Ошибка. Пример: <code>/setwin 7127705775 win</code>", parse_mode="HTML")
-
+            await message.answer("❌ Формат: `/setwin tg_id win` (или lose)")
 
 # ==========================================
-# 🚀 FASTAPI СЕРВЕР И ФОНОВЫЙ ЗАПУСК БОТА
+# 🚀 LIFESPAN & FASTAPI
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     polling_task = None
     if bot:
-        # Запускаем бота в фоне, чтобы FastAPI успел открыть порт для Render
         polling_task = asyncio.create_task(dp.start_polling(bot))
-        logger.info("🤖 Telegram бот успешно запущен в фоновом режиме!")
-    else:
-        logger.warning("⚠️ Бот не запущен, так как отсутствует BOT_TOKEN.")
-    
     yield
-    
     if polling_task:
         polling_task.cancel()
         if bot:
             await bot.session.close()
-        logger.info("🛑 Бот остановлен.")
 
 app = FastAPI(title="TSTCOIN API", lifespan=lifespan)
 
-# Разрешаем CORS, чтобы Mini App на Vercel/Netlify мог общаться с бэкендом
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -162,77 +139,129 @@ app.add_middleware(
 )
 
 # ==========================================
-# 🌐 API ЭНДПОИНТЫ ДЛЯ MINI APP
+# 🌐 API ЭНДПОИНТЫ ПОД SWAGGER
 # ==========================================
-class UserInitRequest(BaseModel):
-    tg_id: int
-    username: Optional[str] = "Боец"
-
-class BetRequest(BaseModel):
-    tg_id: int
-    amount: int
-    multiplier: float = 2.0
 
 @app.get("/")
 async def health_check():
-    """Эндпоинт для проверки здоровья (Render и UptimeRobot пингуют его)"""
-    return {
-        "status": "ok", 
-        "game": "TSTCOIN", 
-        "render_url": RENDER_URL,
-        "active_users": len(users_db)
-    }
+    return {"status": "ok", "game": "TSTCOIN", "active_users": len(users_db)}
 
-@app.post("/api/user/init")
-async def api_user_init(data: UserInitRequest):
-    """Инициализация профиля игрока в Mini App (убирает экран 'Загрузка...')"""
-    user = get_or_create_user(data.tg_id, data.username)
+# 1. Получить профиль
+@app.get("/api/profile/{tg_id}")
+async def get_profile(tg_id: int):
+    user = get_or_create_user(tg_id)
     if user["is_banned"]:
-        raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
+        raise HTTPException(status_code=403, detail="Заблокирован")
     return user
 
-@app.post("/api/daily/claim")
-async def api_daily_claim(data: UserInitRequest):
-    """Сбор ежедневной награды"""
-    user = get_or_create_user(data.tg_id)
+# 2. Ежедневная награда
+@app.post("/api/daily/{tg_id}")
+async def claim_daily(tg_id: int):
+    user = get_or_create_user(tg_id)
     if user["daily_claimed"]:
         raise HTTPException(status_code=400, detail="Уже получено сегодня")
     
     reward = 25000
     user["balance"] += reward
     user["daily_claimed"] = True
-    user["xp"] += 150
     return {"status": "success", "reward": reward, "new_balance": user["balance"]}
 
-@app.post("/api/casino/play")
-async def api_casino_play(bet: BetRequest):
-    """Игровая механика с учетом админской подкрутки"""
-    user = get_or_create_user(bet.tg_id)
-    if bet.amount <= 0 or bet.amount > user["balance"]:
-        raise HTTPException(status_code=400, detail="Недостаточно монет")
+# 3. Получить доступ к магазину
+@app.get("/api/магазин")
+async def get_shop():
+    return {"items": SHOP_ITEMS}
 
+# 4. Купить товар в магазине
+class BuyRequest(BaseModel):
+    tg_id: int
+    item_id: int
+
+@app.post("/api/магазин/купить")
+async def buy_item(data: BuyRequest):
+    user = get_or_create_user(data.tg_id)
+    item = next((i for i in SHOP_ITEMS if i["id"] == data.item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    if user["balance"] < item["price"]:
+        raise HTTPException(status_code=400, detail="Недостаточно средств")
+    
+    user["balance"] -= item["price"]
+    user["inventory"].append(item)
+    return {"status": "success", "new_balance": user["balance"], "item": item}
+
+# 5. Получить инвентарь
+@app.get("/api/инвентарь/{tg_id}")
+async def get_inventory(tg_id: int):
+    user = get_or_create_user(tg_id)
+    return {"inventory": user["inventory"]}
+
+# 6. Игра в Апгрейдер казино
+class UpgraderRequest(BaseModel):
+    tg_id: int
+    amount: int
+    multiplier: float = 2.0
+
+@app.post("/api/casino/upgrader")
+async def casino_upgrader(bet: UpgraderRequest):
+    user = get_or_create_user(bet.tg_id)
+    if bet.amount <= 0 or user["balance"] < bet.amount:
+        raise HTTPException(status_code=400, detail="Неверная ставка")
+    
     user["balance"] -= bet.amount
 
-    # Проверка подкрутки из админки
+    # Проверка подкрутки
     if user["force_win"] == "win":
         is_win = True
-        user["force_win"] = None  # Сбрасываем одноразовую подкрутку
+        user["force_win"] = None
     elif user["force_win"] == "lose":
         is_win = False
         user["force_win"] = None
     else:
-        # Стандартный шанс с небольшим преимуществом казино
         win_chance = (100.0 / bet.multiplier) * 0.95
         is_win = random.uniform(0, 100) <= win_chance
 
     payout = int(bet.amount * bet.multiplier) if is_win else 0
     if is_win:
         user["balance"] += payout
-        user["xp"] += 50
 
-    return {
-        "win": is_win,
-        "payout": payout,
-        "new_balance": user["balance"]
-    }
+    return {"win": is_win, "payout": payout, "new_balance": user["balance"]}
+
+# 7. Получить бизнесы
+@app.get("/api/businesses/{tg_id}")
+async def get_businesses(tg_id: int):
+    user = get_or_create_user(tg_id)
+    return {"businesses": user["businesses"]}
+
+# 8. Собирать доход с бизнеса
+@app.post("/api/businesses/collect/{biz_id}")
+async def collect_business(biz_id: int, data: dict):
+    # Ожидаем tg_id в теле запроса
+    tg_id = data.get("tg_id")
+    if not tg_id:
+        raise HTTPException(status_code=400, detail="Укажите tg_id")
+    user = get_or_create_user(int(tg_id))
+    
+    biz = next((b for b in user["businesses"] if b["biz_id"] == biz_id), None)
+    if not biz:
+        raise HTTPException(status_code=404, detail="Бизнес не найден")
+    
+    earned = biz["accumulated"]
+    if earned <= 0:
+        raise HTTPException(status_code=400, detail="Собирать пока нечего")
+    
+    user["balance"] += earned
+    biz["accumulated"] = 0
+    return {"status": "success", "collected": earned, "new_balance": user["balance"]}
+
+# 9. Рейтинг
+@app.get("/api/рэйтинг")
+@app.get("/api/рейтинг")
+async def get_rating():
+    # Возвращаем простой топ игроков на основе нашей базы
+    sorted_users = sorted(users_db.values(), key=lambda x: x["balance"], reverse=True)
+    leaderboard = [
+        {"rank": idx + 1, "nickname": u["nickname"], "balance": u["balance"], "gang": u["gang"]}
+        for idx, u in enumerate(sorted_users[:10])
+    ]
+    return {"leaderboard": leaderboard}
 
