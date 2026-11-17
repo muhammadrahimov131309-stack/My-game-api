@@ -23,7 +23,6 @@
   }
   .wrap{max-width:520px; margin:0 auto; padding:14px 14px 0;}
 
-  /* --- СКРЫТИЕ ЭКРАНОВ --- */
   .screen { display: none; animation: fadeIn 0.3s ease; }
   .screen.active { display: block; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -120,7 +119,7 @@
   .fitem .ft{color:var(--dim);}
   .fitem .ft b{color:var(--txt); font-weight:700;}
 
-  /* ===== МАГАЗИН (АДАПТИРОВАННЫЙ) ===== */
+  /* ===== МАГАЗИН ===== */
   .shop-section { margin-bottom: 20px; }
   .shop-carousel { display: flex; gap: 12px; overflow-x: auto; padding: 0 0 10px 0; scrollbar-width: none; }
   .shop-carousel::-webkit-scrollbar { display: none; }
@@ -209,26 +208,26 @@
       <div class="row">
         <div class="avatar">🎮</div>
         <div>
-          <div class="nick">Вася</div>
-          <div class="lvl-chip">⚔️ Уровень 12</div>
+          <div class="nick" id="ui-nick">Загрузка...</div>
+          <div class="lvl-chip" id="ui-level">⚔️ Уровень 1</div>
         </div>
         <div class="spacer"></div>
-        <div class="id-chip">#7127</div>
+        <div class="id-chip" id="ui-id">#0000</div>
       </div>
-      <div class="xpbar"><div></div></div>
+      <div class="xpbar"><div id="ui-xp"></div></div>
     </div>
 
     <div class="balance">
       <div class="bal-label">Баланс</div>
-      <div class="bal-value">1 250 000 🪙</div>
+      <div class="bal-value" id="ui-balance">0 🪙</div>
       <div class="bal-btns">
-        <button class="btn btn-gold" onclick="openSheet('💼', 'Заработать', 'Переход в раздел Работы...')">💼 Заработать</button>
+        <button class="btn btn-gold" onclick="openTab('work', document.querySelectorAll('.tab')[3])">💼 Заработать</button>
         <button class="btn btn-ghost" onclick="openTab('casino', document.querySelectorAll('.tab')[2])">🎰 В казино</button>
       </div>
     </div>
 
     <div class="stats">
-      <div class="stat rang"><div class="ic">🏆</div><div class="v">#1234</div><div class="l">Топ</div></div>
+      <div class="stat rang"><div class="ic">🏆</div><div class="v" id="ui-rank">#—</div><div class="l">Топ</div></div>
       <div class="stat gang"><div class="ic">🏴</div><div class="v">SHADOW</div><div class="l">Банда</div></div>
       <div class="stat lvl"><div class="ic">✨</div><div class="v">450</div><div class="l">XP</div></div>
     </div>
@@ -236,8 +235,8 @@
     <div class="sec">
       <div class="sec-head"><div class="sec-title">🔥 Ежедневки</div></div>
       <div class="duo">
-        <div class="card action daily" onclick="openSheet('🎁', 'Награды', 'Ты заходишь 3-й день подряд! Забери 25 000 монет.')">
-          <div class="pulse">ГОТОВО</div>
+        <div class="card action daily" onclick="claimDaily()">
+          <div class="pulse" id="daily-pulse">ГОТОВО</div>
           <div class="big">🎁</div>
           <div class="t">День 3/30</div>
           <div class="d">Забери 25 000 монет.</div>
@@ -408,23 +407,31 @@
 </div></div>
 
 <script>
+  // Инициализация Telegram
+  const tg = window.Telegram.WebApp;
+  tg.expand();
+  tg.setHeaderColor('#0a0b14');
+  tg.setBackgroundColor('#0a0b14');
+  
+  const API_URL = "https://my-game-api-jm79.onrender.com"; // ТВОЯ ССЫЛКА НА RENDER
+  const userId = tg.initDataUnsafe?.user?.id || 7127705775;
+  let currentBalance = 0;
+
+  function haptic() { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); }
+
   // Навигация
   function openTab(tabName, btn) {
-      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-      
+      haptic();
       document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
       document.getElementById('screen-' + tabName).classList.add('active');
-      
       document.querySelectorAll('.tab').forEach(el => el.classList.remove('on'));
       btn.classList.add('on');
-      
-      // Скролл вверх при смене таба
       window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // Модалка
   function openSheet(icon, title, text) {
-      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       document.getElementById('bs-icon').innerText = icon;
       document.getElementById('bs-title').innerText = title;
       document.getElementById('bs-text').innerText = text;
@@ -435,10 +442,42 @@
       document.getElementById('bottomSheet').classList.remove('active');
   }
 
+  // Загрузка профиля
+  async function loadProfile() {
+      try {
+          const res = await fetch(`${API_URL}/api/profile/${userId}`);
+          if(!res.ok) throw new Error("Нет игрока");
+          const data = await res.json();
+          
+          document.getElementById('ui-nick').innerText = data.nickname;
+          document.getElementById('ui-balance').innerText = data.balance.toLocaleString('ru-RU') + ' 🪙';
+          document.getElementById('ui-level').innerText = `⚔️ Уровень ${data.level}`;
+          document.getElementById('ui-rank').innerText = `#${data.rank}`;
+          document.getElementById('ui-id').innerText = `#${userId.toString().slice(-4)}`;
+          currentBalance = data.balance;
+      } catch (e) {
+          document.getElementById('ui-nick').innerText = "Ошибка сети";
+      }
+  }
+
+  // Ежедневная награда
+  async function claimDaily() {
+      haptic();
+      try {
+          const res = await fetch(`${API_URL}/api/daily/${userId}`, { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+              document.getElementById('ui-balance').innerText = data.new_balance.toLocaleString('ru-RU') + ' 🪙';
+              openSheet('🎁', 'Успех!', `Ты получил ${data.reward.toLocaleString('ru-RU')} монет!`);
+          } else {
+              openSheet('❌', 'Ошибка', data.detail);
+          }
+      } catch(e) { openSheet('❌', 'Ошибка', 'Сервер спит или недоступен'); }
+  }
+
   // Детали предмета
   function openItemDetail(title, price, imgUrl, rarity, stat2) {
-      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-
+      haptic();
       document.getElementById('detail-title').innerText = title;
       document.getElementById('detail-price').innerText = price;
       document.getElementById('detail-rarity').innerText = rarity;
@@ -452,9 +491,12 @@
   }
 
   function closeItemDetail() {
-      if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+      haptic();
       document.getElementById('screen-item-detail').style.display = 'none';
   }
+
+  // Старт
+  loadProfile();
 </script>
 </body>
-    </html>
+</html>
