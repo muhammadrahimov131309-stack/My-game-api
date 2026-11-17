@@ -1,140 +1,238 @@
 import os
-import random
 import asyncio
-import asyncpg
-from datetime import date, timedelta
+import logging
+import random
 from contextlib import asynccontextmanager
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, Update
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import CommandStart, Command
+from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 
-load_dotenv()
-
+# ==========================================
+# ⚙️ ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ (Твои настройки)
+# ==========================================
 DATABASE_URL = os.getenv("DATABASE_URL")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7127705775"))
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://your-app.pages.dev")
-# Ссылка на твой сервис на Render (без слэша на конце)
 RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "https://my-game-api-jm79.onrender.com")
 
-pool = None
-bot = Bot(token=BOT_TOKEN)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Проверка токена
+if not BOT_TOKEN:
+    logger.warning("⚠️ Внимание: BOT_TOKEN не задан! Бот не сможет запуститься, пока вы не укажете его в настройках Render.")
+
+# ==========================================
+# 🗄 БАЗА ДАННЫХ (Временная в памяти для быстрого старта)
+# ==========================================
+users_db = {}
+
+def get_or_create_user(tg_id: int, username: str = "Боец"):
+    if tg_id not in users_db:
+        users_db[tg_id] = {
+            "id": len(users_db) + 1,
+            "tg_id": tg_id,
+            "nickname": username,
+            "balance": 10000,          # Стартовый бонус по ТЗ
+            "level": 1,
+            "xp": 450,
+            "max_xp": 1000,
+            "gang": "SHADOW",          # Как на твоем скриншоте
+            "rank": len(users_db) + 1,
+            "daily_day": 3,
+            "daily_claimed": False,
+            "slot_spins": 1,
+            "inventory": [
+                {"id": 1, "name": "Кепка новичка", "type": "accessory", "rarity": "common", "price": 1000},
+                {"id": 2, "name": "Белая футболка", "type": "skin", "rarity": "common", "price": 2500},
+                {"id": 3, "name": "Тренч SHADOW", "type": "skin", "rarity": "epic", "price": 50000},
+            ],
+            "force_win": None,         # 'win' / 'lose' / None (подкрутка из админки)
+            "is_banned": False
+        }
+    return users_db[tg_id]
+
+# ==========================================
+# 🤖 TELEGRAM БОТ (AIOGRAM 3)
+# ==========================================
+bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
 dp = Dispatcher()
 
-class Reg(StatesGroup):
-    waiting_nickname = State()
+if bot:
+    @dp.message(CommandStart())
+    async def cmd_start(message: types.Message):
+        user = get_or_create_user(message.from_user.id, message.from_user.first_name)
+        if user["is_banned"]:
+            return await message.answer("🚫 Ваш аккаунт заблокирован администрацией.")
 
-async def init_db():
-    global pool
-    dsn = DATABASE_URL.replace("?sslmode=require", "?ssl=true")
-    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
-    async with pool.acquire() as conn:
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                tg_id BIGINT PRIMARY KEY, nickname TEXT UNIQUE, balance BIGINT DEFAULT 10000, 
-                level INT DEFAULT 1, xp INT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE TABLE IF NOT EXISTS daily_rewards (
-                tg_id BIGINT PRIMARY KEY, last_claim DATE, streak INT DEFAULT 0
-            );
-        """)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎮 Открыть TSTCOIN", web_app=WebAppInfo(url=MINI_APP_URL))]
+        ])
+        await message.answer(
+            f"👋 Привет, <b>{user['nickname']}</b>!\n\n"
+            f"Добро пожаловать в <b>TSTCOIN</b>.\n"
+            f"💰 Твой баланс: <b>{user['balance']:,}</b> монет\n"
+            f"🏴 Банда: <b>{user['gang']}</b>\n\n"
+            f"Жми кнопку ниже, чтобы войти в игру 👇",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
 
-def main_menu_kb():
-    return ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="💰 Баланс")],
-        [KeyboardButton(text="🎮 Открыть игру", web_app={"url": MINI_APP_URL})]
-    ], resize_keyboard=True)
+    # --- 🛡 АДМИН-ПАНЕЛЬ В ТЕЛЕГРАМЕ ---
+    @dp.message(Command("admin"))
+    async def cmd_admin(message: types.Message):
+        if message.from_user.id != ADMIN_ID:
+            return
+        
+        text = (
+            "🛡 <b>АДМИН-ПАНЕЛЬ TSTCOIN</b>\n\n"
+            "Команды управления:\n"
+            "• <code>/give [tg_id] [сумма]</code> — выдать монеты\n"
+            "• <code>/setwin [tg_id] win</code> — подкрутить победу\n"
+            "• <code>/setwin [tg_id] lose</code> — подкрутить слив\n"
+            "• <code>/ban [tg_id]</code> — заблокировать игрока\n"
+            f"\nАктивных игроков в базе: <b>{len(users_db)}</b>"
+        )
+        await message.answer(text, parse_mode="HTML")
 
-@dp.message(Command("start"))
-async def cmd_start(message: Message, state: FSMContext):
-    async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", message.from_user.id)
-    
-    if user:
-        await message.answer(f"С возвращением, {user['nickname']}! Баланс: {user['balance']} 💰", reply_markup=main_menu_kb())
-    else:
-        await state.set_state(Reg.waiting_nickname)
-        await message.answer("Привет! Как тебя зовут, боец? Напиши свой ник:")
+    @dp.message(Command("give"))
+    async def admin_give(message: types.Message):
+        if message.from_user.id != ADMIN_ID:
+            return
+        try:
+            _, target_id, amount = message.text.split()
+            target_id, amount = int(target_id), int(amount)
+            user = get_or_create_user(target_id)
+            user["balance"] += amount
+            await message.answer(f"✅ Игроку <code>{target_id}</code> начислено <b>{amount:,}</b> монет.", parse_mode="HTML")
+        except Exception:
+            await message.answer("❌ Ошибка. Пример: <code>/give 7127705775 50000</code>", parse_mode="HTML")
 
-@dp.message(Reg.waiting_nickname)
-async def process_nickname(message: Message, state: FSMContext):
-    nickname = message.text.strip()
-    if len(nickname) < 2:
-        await message.answer("Слишком коротко. Напиши ник:")
-        return
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute("INSERT INTO users (tg_id, nickname) VALUES ($1, $2)", message.from_user.id, nickname)
-        await state.clear()
-        await message.answer(f"Добро пожаловать, {nickname}! Ты получаешь 10 000 монет 💰", reply_markup=main_menu_kb())
-    except asyncpg.UniqueViolationError:
-        await message.answer("Этот ник уже занят. Придумай другой:")
+    @dp.message(Command("setwin"))
+    async def admin_setwin(message: types.Message):
+        if message.from_user.id != ADMIN_ID:
+            return
+        try:
+            _, target_id, mode = message.text.split()
+            target_id = int(target_id)
+            user = get_or_create_user(target_id)
+            user["force_win"] = mode if mode in ["win", "lose"] else None
+            await message.answer(f"🎲 Подкрутка для <code>{target_id}</code>: <b>{user['force_win']}</b>", parse_mode="HTML")
+        except Exception:
+            await message.answer("❌ Ошибка. Пример: <code>/setwin 7127705775 win</code>", parse_mode="HTML")
 
-@dp.message(F.text == "👤 Профиль")
-async def bot_profile(message: Message):
-    async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT * FROM users WHERE tg_id = $1", message.from_user.id)
-    if not user: return await message.answer("Напиши /start")
-    await message.answer(f"👤 Ник: {user['nickname']}\n💰 Баланс: {user['balance']}\n📈 Уровень: {user['level']}")
 
-@dp.message(F.text == "💰 Баланс")
-async def bot_balance(message: Message):
-    async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT balance FROM users WHERE tg_id = $1", message.from_user.id)
-    if user: await message.answer(f"💰 Баланс: {user['balance']} монет")
-
-# --- API ---
+# ==========================================
+# 🚀 FASTAPI СЕРВЕР И ФОНОВЫЙ ЗАПУСК БОТА
+# ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
-    # Устанавливаем вебхук для бота
-    webhook_url = f"{RENDER_URL}/webhook"
-    await bot.set_webhook(webhook_url, drop_pending_updates=True)
+    polling_task = None
+    if bot:
+        # Запускаем бота в фоне, чтобы FastAPI успел открыть порт для Render
+        polling_task = asyncio.create_task(dp.start_polling(bot))
+        logger.info("🤖 Telegram бот успешно запущен в фоновом режиме!")
+    else:
+        logger.warning("⚠️ Бот не запущен, так как отсутствует BOT_TOKEN.")
+    
     yield
-    await bot.session.close()
-    await pool.close()
+    
+    if polling_task:
+        polling_task.cancel()
+        if bot:
+            await bot.session.close()
+        logger.info("🛑 Бот остановлен.")
 
-app = FastAPI(lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app = FastAPI(title="TSTCOIN API", lifespan=lifespan)
 
-@app.post("/webhook")
-async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = Update(**data)
-    await dp.feed_update(bot=bot, update=update)
-    return {"ok": True}
+# Разрешаем CORS, чтобы Mini App на Vercel/Netlify мог общаться с бэкендом
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/api/profile/{tg_id}")
-async def api_profile(tg_id: int):
-    async with pool.acquire() as conn:
-        user = await conn.fetchrow("SELECT nickname, balance, level FROM users WHERE tg_id = $1", tg_id)
-        if not user: raise HTTPException(404, "Игрок не найден")
-        rank = await conn.fetchval("SELECT COUNT(*) FROM users WHERE balance > $1", user['balance']) + 1
-    return {"nickname": user['nickname'], "balance": user['balance'], "level": user['level'], "rank": rank}
+# ==========================================
+# 🌐 API ЭНДПОИНТЫ ДЛЯ MINI APP
+# ==========================================
+class UserInitRequest(BaseModel):
+    tg_id: int
+    username: Optional[str] = "Боец"
 
-@app.post("/api/daily/{tg_id}")
-async def api_daily(tg_id: int):
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT last_claim, streak FROM daily_rewards WHERE tg_id = $1", tg_id)
-        today = date.today()
-        if row and row['last_claim'] == today:
-            raise HTTPException(400, "Уже забрал сегодня!")
-        streak = 1
-        if row and row['last_claim'] == today - timedelta(days=1):
-            streak = row['streak'] + 1
-        reward = 5000 * streak
-        await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", reward, tg_id)
-        await conn.execute("""
-            INSERT INTO daily_rewards (tg_id, last_claim, streak) VALUES ($1, $2, $3)
-            ON CONFLICT (tg_id) DO UPDATE SET last_claim = $2, streak = $3
-        """, tg_id, today, streak)
-        new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", tg_id)
-        return {"reward": reward, "new_balance": new_bal}
+class BetRequest(BaseModel):
+    tg_id: int
+    amount: int
+    multiplier: float = 2.0
+
+@app.get("/")
+async def health_check():
+    """Эндпоинт для проверки здоровья (Render и UptimeRobot пингуют его)"""
+    return {
+        "status": "ok", 
+        "game": "TSTCOIN", 
+        "render_url": RENDER_URL,
+        "active_users": len(users_db)
+    }
+
+@app.post("/api/user/init")
+async def api_user_init(data: UserInitRequest):
+    """Инициализация профиля игрока в Mini App (убирает экран 'Загрузка...')"""
+    user = get_or_create_user(data.tg_id, data.username)
+    if user["is_banned"]:
+        raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
+    return user
+
+@app.post("/api/daily/claim")
+async def api_daily_claim(data: UserInitRequest):
+    """Сбор ежедневной награды"""
+    user = get_or_create_user(data.tg_id)
+    if user["daily_claimed"]:
+        raise HTTPException(status_code=400, detail="Уже получено сегодня")
+    
+    reward = 25000
+    user["balance"] += reward
+    user["daily_claimed"] = True
+    user["xp"] += 150
+    return {"status": "success", "reward": reward, "new_balance": user["balance"]}
+
+@app.post("/api/casino/play")
+async def api_casino_play(bet: BetRequest):
+    """Игровая механика с учетом админской подкрутки"""
+    user = get_or_create_user(bet.tg_id)
+    if bet.amount <= 0 or bet.amount > user["balance"]:
+        raise HTTPException(status_code=400, detail="Недостаточно монет")
+
+    user["balance"] -= bet.amount
+
+    # Проверка подкрутки из админки
+    if user["force_win"] == "win":
+        is_win = True
+        user["force_win"] = None  # Сбрасываем одноразовую подкрутку
+    elif user["force_win"] == "lose":
+        is_win = False
+        user["force_win"] = None
+    else:
+        # Стандартный шанс с небольшим преимуществом казино
+        win_chance = (100.0 / bet.multiplier) * 0.95
+        is_win = random.uniform(0, 100) <= win_chance
+
+    payout = int(bet.amount * bet.multiplier) if is_win else 0
+    if is_win:
+        user["balance"] += payout
+        user["xp"] += 50
+
+    return {
+        "win": is_win,
+        "payout": payout,
+        "new_balance": user["balance"]
+    }
+
