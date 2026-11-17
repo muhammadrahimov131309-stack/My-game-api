@@ -1,4 +1,3 @@
-
 import os
 import random
 import asyncio
@@ -6,14 +5,14 @@ import asyncpg
 from datetime import date, timedelta
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, Update
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -23,6 +22,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7127705775"))
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://your-app.pages.dev")
+# Ссылка на твой сервис на Render (без слэша на конце)
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "https://my-game-api-jm79.onrender.com")
 
 pool = None
 bot = Bot(token=BOT_TOKEN)
@@ -90,16 +91,26 @@ async def bot_balance(message: Message):
         user = await conn.fetchrow("SELECT balance FROM users WHERE tg_id = $1", message.from_user.id)
     if user: await message.answer(f"💰 Баланс: {user['balance']} монет")
 
+# --- API ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    asyncio.create_task(dp.start_polling(bot))
+    # Устанавливаем вебхук для бота
+    webhook_url = f"{RENDER_URL}/webhook"
+    await bot.set_webhook(webhook_url, drop_pending_updates=True)
     yield
     await bot.session.close()
     await pool.close()
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    update = Update(**data)
+    await dp.feed_update(bot=bot, update=update)
+    return {"ok": True}
 
 @app.get("/api/profile/{tg_id}")
 async def api_profile(tg_id: int):
@@ -116,17 +127,14 @@ async def api_daily(tg_id: int):
         today = date.today()
         if row and row['last_claim'] == today:
             raise HTTPException(400, "Уже забрал сегодня!")
-        
         streak = 1
         if row and row['last_claim'] == today - timedelta(days=1):
             streak = row['streak'] + 1
-            
         reward = 5000 * streak
         await conn.execute("UPDATE users SET balance = balance + $1 WHERE tg_id = $2", reward, tg_id)
         await conn.execute("""
             INSERT INTO daily_rewards (tg_id, last_claim, streak) VALUES ($1, $2, $3)
             ON CONFLICT (tg_id) DO UPDATE SET last_claim = $2, streak = $3
         """, tg_id, today, streak)
-        
         new_bal = await conn.fetchval("SELECT balance FROM users WHERE tg_id = $1", tg_id)
         return {"reward": reward, "new_balance": new_bal}
